@@ -12,6 +12,12 @@ const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || '';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'village-azaleia';
 
+// Evita a função ficar pendurada se a Evolution API não responder (ex: instância num estado limbo)
+const EXTERNAL_TIMEOUT_MS = 15000;
+function timeoutSignal() {
+  return AbortSignal.timeout(EXTERNAL_TIMEOUT_MS);
+}
+
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
@@ -27,7 +33,7 @@ export default async function handler(request: Request): Promise<Response> {
   try {
     const stateRes = await fetch(
       `${EVOLUTION_API_URL.replace(/\/$/, '')}/instance/connectionState/${EVOLUTION_INSTANCE}`,
-      { headers: { apikey: EVOLUTION_API_KEY } }
+      { headers: { apikey: EVOLUTION_API_KEY }, signal: timeoutSignal() }
     );
 
     if (stateRes.status === 404) {
@@ -55,7 +61,7 @@ export default async function handler(request: Request): Promise<Response> {
       try {
         const fetchRes = await fetch(
           `${EVOLUTION_API_URL.replace(/\/$/, '')}/instance/fetchInstances?instanceName=${EVOLUTION_INSTANCE}`,
-          { headers: { apikey: EVOLUTION_API_KEY } }
+          { headers: { apikey: EVOLUTION_API_KEY }, signal: timeoutSignal() }
         );
         if (fetchRes.ok) {
           const list: any = await fetchRes.json();

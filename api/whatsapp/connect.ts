@@ -12,6 +12,14 @@ const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || '';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'village-azaleia';
 
+// Timeout de segurança: uma instância travada num estado limbo (ex: "connecting" órfão)
+// pode fazer a Evolution API nunca responder. Sem isso, a função serverless fica pendurada
+// até o limite do Vercel e o usuário só vê "carregando" pra sempre, sem erro nenhum.
+const EXTERNAL_TIMEOUT_MS = 15000;
+function timeoutSignal() {
+  return AbortSignal.timeout(EXTERNAL_TIMEOUT_MS);
+}
+
 /** Procura recursivamente por um campo de imagem base64 (QR Code) na resposta da Evolution API,
  * já que o formato exato do payload varia um pouco entre versões do Evolution API. */
 function findBase64QrCode(obj: any, depth = 0): string | null {
@@ -49,7 +57,10 @@ export default async function handler(request: Request): Promise<Response> {
 
   try {
     // 1. Verifica se a instância village-azaleia já existe (filtrando só por esse nome)
-    const fetchRes = await fetch(`${baseUrl}/instance/fetchInstances?instanceName=${EVOLUTION_INSTANCE}`, { headers });
+    const fetchRes = await fetch(`${baseUrl}/instance/fetchInstances?instanceName=${EVOLUTION_INSTANCE}`, {
+      headers,
+      signal: timeoutSignal()
+    });
     let exists = false;
     if (fetchRes.ok) {
       const list: any = await fetchRes.json();
@@ -65,7 +76,8 @@ export default async function handler(request: Request): Promise<Response> {
           instanceName: EVOLUTION_INSTANCE,
           qrcode: true,
           integration: 'WHATSAPP-BAILEYS'
-        })
+        }),
+        signal: timeoutSignal()
       });
 
       if (createRes.ok) {
@@ -81,7 +93,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     // 3. Instância já existe (ou acabou de ser criada sem QR na resposta) — pede o QR de conexão
-    const connectRes = await fetch(`${baseUrl}/instance/connect/${EVOLUTION_INSTANCE}`, { headers });
+    const connectRes = await fetch(`${baseUrl}/instance/connect/${EVOLUTION_INSTANCE}`, { headers, signal: timeoutSignal() });
     if (!connectRes.ok) {
       return new Response(JSON.stringify({ status: 'error', error: `Evolution API retornou ${connectRes.status} ao conectar.` }), {
         status: 200,
@@ -105,9 +117,15 @@ export default async function handler(request: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ status: 'error', error: err?.message || 'Erro ao conectar instância' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const isTimeout = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    return new Response(
+      JSON.stringify({
+        status: 'error',
+        error: isTimeout
+          ? 'A Evolution API demorou demais pra responder. A instância pode estar num estado travado — tente novamente em alguns segundos.'
+          : err?.message || 'Erro ao conectar instância'
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 }
