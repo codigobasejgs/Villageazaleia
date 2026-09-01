@@ -61,11 +61,8 @@ Analise a foto da etiqueta anexada e extraia com precisão:
 - Uma confiança de 0 a 100 refletindo a nitidez e completude da leitura.
 Se algum campo não estiver legível ou não existir na etiqueta, retorne null para ele (exceto carrier, rawText e confidence, que são obrigatórios).`;
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
-  }
-
+// Named HTTP method export (formato exigido pelo Vercel pra respostas Web-standard).
+export async function POST(request: Request): Promise<Response> {
   if (!GEMINI_API_KEY) {
     return new Response(JSON.stringify({ error: 'Gemini API não configurada no servidor.' }), {
       status: 500,

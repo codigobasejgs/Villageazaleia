@@ -18,11 +18,10 @@ function timeoutSignal() {
   return AbortSignal.timeout(EXTERNAL_TIMEOUT_MS);
 }
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'GET') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
-  }
-
+// Named HTTP method export (formato exigido pelo Vercel pra respostas Web-standard).
+// Com `export default`, o Vercel trata como a assinatura antiga (req, res) e IGNORA o
+// Response retornado — a requisição fica pendurada até dar 504.
+export async function GET(): Promise<Response> {
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     return new Response(
       JSON.stringify({ connected: false, exists: false, error: 'Evolution API não configurada no servidor.' }),

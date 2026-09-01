@@ -17,11 +17,8 @@ const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'village-azaleia';
 // Evita a função ficar pendurada se a Evolution API não responder
 const EXTERNAL_TIMEOUT_MS = 15000;
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ status: 'FAILED', error: 'Method not allowed' }), { status: 405 });
-  }
-
+// Named HTTP method export (formato exigido pelo Vercel pra respostas Web-standard).
+export async function POST(request: Request): Promise<Response> {
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     return new Response(JSON.stringify({ status: 'FAILED', error: 'Evolution API não configurada no servidor.' }), {
       status: 200,
