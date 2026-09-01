@@ -26,6 +26,7 @@ import { PackageScannerOCR } from './PackageScannerOCR';
 import { ExtractedLabelData } from '../services/ocr-parser.service';
 import { residentMatcherService, ResidentMatchResult } from '../services/resident-matcher.service';
 import { shelfAllocatorService } from '../services/shelf-allocator.service';
+import { storageService } from '../services/storage.service';
 
 // Payload aceito por App.tsx: handleAddPackage (ver src/App.tsx)
 export type PackageIntakePayload = Omit<PackageItem, 'id' | 'status' | 'receivedAt' | 'qrToken'> & {
@@ -85,6 +86,10 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
   const [trackingInput, setTrackingInput] = useState('');
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [unitSearchText, setUnitSearchText] = useState('');
+  // Cadastro manual de bloco/apto quando o morador ainda não existe na base (sem limite de 360 unidades)
+  const [manualBlock, setManualBlock] = useState('');
+  const [manualApartment, setManualApartment] = useState('');
+  const [manualResidentName, setManualResidentName] = useState('');
   const [selectedCarrier, setSelectedCarrier] = useState<Carrier>('Mercado Livre');
   const [selectedShelf, setSelectedShelf] = useState<ShelfLetter>('A');
   const [selectedLevel, setSelectedLevel] = useState<ShelfLevel>(1);
@@ -228,7 +233,7 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
   };
 
   // Core Package Registration Execution
-  const handleExecuteAddPackage = () => {
+  const handleExecuteAddPackage = async () => {
     if (!selectedUnit) {
       onShowToast('Selecione a Unidade/Morador de destino!', 'warning');
       return;
@@ -240,6 +245,12 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
     const tracking = trackingInput.trim() || `PKG-${Date.now().toString().slice(-6)}`;
     const shelf: StorageLocation = { shelf: selectedShelf, level: selectedLevel };
 
+    // Upload package photo to Supabase Storage Bucket
+    let finalPhotoUrl = selectedPhoto;
+    if (selectedPhoto && selectedPhoto.startsWith('data:')) {
+      finalPhotoUrl = await storageService.uploadFile('packages', selectedPhoto);
+    }
+
     onAddPackage({
       trackingCode: tracking,
       unitId: selectedUnit.id,
@@ -248,7 +259,7 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
       residentName: selectedUnit.residentName,
       carrier: selectedCarrier,
       shelf,
-      photoUrl: selectedPhoto,
+      photoUrl: finalPhotoUrl,
       notes: notes.trim() || (lastOcrResult ? `Recepção Automatizada OCR (${selectedCarrier})` : undefined),
       operatorName,
       registeredVia,
@@ -790,6 +801,70 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
                           </span>
                         </button>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Nenhum morador ainda cadastrado pra este bloco/apto — condomínio não tem limite fixo
+                      de unidades, então permite registrar a encomenda mesmo assim, digitando na mão. */}
+                  {unitSearchText.trim() !== '' && filteredUnits.length === 0 && (
+                    <div className="mt-3 p-4 rounded-2xl bg-amber-50 border border-amber-300 space-y-3">
+                      <div className="flex items-center gap-2 text-amber-800 text-xs font-bold">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>Morador ainda não cadastrado. Registre a encomenda mesmo assim:</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={manualBlock}
+                          onChange={(e) => setManualBlock(e.target.value)}
+                          placeholder="Bloco (ex: 3 ou 12B)"
+                          className="bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs text-[#0D3823] font-bold focus:outline-none focus:border-[#D81B60]"
+                        />
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={manualApartment}
+                          onChange={(e) => setManualApartment(e.target.value)}
+                          placeholder="Apartamento"
+                          className="bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs text-[#0D3823] font-bold focus:outline-none focus:border-[#D81B60]"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={manualResidentName}
+                        onChange={(e) => setManualResidentName(e.target.value)}
+                        placeholder="Nome do morador (opcional por enquanto)"
+                        className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-xs text-[#0D3823] font-semibold focus:outline-none focus:border-[#D81B60]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const block = manualBlock.trim();
+                          const apartment = parseInt(manualApartment, 10);
+                          if (!block || !apartment) {
+                            onShowToast('Informe o Bloco e o Apartamento.', 'warning');
+                            return;
+                          }
+                          const residentName = manualResidentName.trim() || `Morador Bloco ${block} Apto ${apartment}`;
+                          setSelectedUnit({
+                            id: `B${String(block).padStart(2, '0')}-A${apartment}`,
+                            block,
+                            apartment,
+                            residentName,
+                            residentPhone: '',
+                            residentPhones: [],
+                            residentEmail: ''
+                          });
+                          setUnitSearchText('');
+                          setManualBlock('');
+                          setManualApartment('');
+                          setManualResidentName('');
+                          sound.playScanBeep();
+                        }}
+                        className="w-full py-2 rounded-lg bg-[#0D3823] hover:bg-[#15462D] text-white text-xs font-bold transition-colors"
+                      >
+                        Usar este Bloco/Apartamento
+                      </button>
                     </div>
                   )}
                 </div>

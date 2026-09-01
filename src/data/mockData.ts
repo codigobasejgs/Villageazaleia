@@ -83,7 +83,10 @@ export function generateAllUnits(): Unit[] {
   return units;
 }
 
-export const ALL_UNITS: Unit[] = generateAllUnits();
+// ponytail: geração de 360 unidades fake mantida só como utilitário de demo/teste local —
+// não é mais usada como seed automático do banco. As unidades reais nascem do cadastro do
+// morador (MoradorRegistrationModal) ou do primeiro pacote registrado pra um bloco/apto novo.
+export const ALL_UNITS: Unit[] = [];
 
 export const CARRIER_CONFIG: Record<Carrier, { color: string; badgeBg: string; textCol: string; borderCol: string; icon: string }> = {
   'Mercado Livre': {

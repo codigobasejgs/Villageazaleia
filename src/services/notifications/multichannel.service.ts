@@ -37,18 +37,16 @@ export class MultichannelNotificationService {
   }
 
   /**
-   * Dispatches Welcome message + LGPD confirmation via Evolution WhatsApp and Resend Email
+   * Dispatches Welcome message + LGPD confirmation via Resend Email only.
+   * O WhatsApp real (Evolution API) dispara SOMENTE "encomenda chegou" e "encomenda retirada" —
+   * decisão explícita do dono do sistema, pra não gastar a conexão do número com boas-vindas.
    */
   public async dispatchWelcomeRegistration(unit: Unit) {
-    const [whatsappDispatches, emailDispatch] = await Promise.all([
-      evolutionService.dispatchWelcomeToUnit(unit),
-      resendService.sendWelcomeEmail(unit)
-    ]);
+    const emailDispatch = await resendService.sendWelcomeEmail(unit);
 
     return {
       unitId: unit.id,
       timestamp: new Date().toISOString(),
-      whatsappDispatches,
       emailDispatch
     };
   }

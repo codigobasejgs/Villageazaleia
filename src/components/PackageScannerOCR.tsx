@@ -22,6 +22,7 @@ import {
   SAMPLE_LABEL_SCENARIOS,
   SampleLabelScenario
 } from '../services/ocr-parser.service';
+import { geminiOcrService } from '../services/gemini-ocr.service';
 import { sound } from '../utils/audio';
 
 interface PackageScannerOCRProps {
@@ -112,72 +113,84 @@ export const PackageScannerOCR: React.FC<PackageScannerOCRProps> = ({
   };
 
   // Perform Image Capture and OCR Pipeline
+  // - Cenários de demonstração (explicitOcrText vindo de SAMPLE_LABEL_SCENARIOS) usam o
+  //   parser regex local — rápido, grátis, sem depender de câmera/API.
+  // - Foto real (câmera ao vivo ou upload de arquivo) usa o Gemini Vision real via
+  //   /api/ocr/analyze-label (ver gemini-ocr.service.ts), com fallback pro parser local
+  //   se a chamada falhar, pra nunca travar o atendimento.
   const captureAndAnalyze = useCallback(
-    (customImageSource?: HTMLImageElement | string, explicitOcrText?: string) => {
+    async (customImageSource?: HTMLImageElement | string, explicitOcrText?: string) => {
       setIsAnalyzing(true);
       setScannerStatus('Processando filtros de contraste e binarização...');
       sound.playScanBeep();
 
-      setTimeout(() => {
-        let photoDataUrl = '';
-        let preprocessedDataUrl = '';
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
-        if (typeof customImageSource === 'string') {
-          photoDataUrl = customImageSource;
-          preprocessedDataUrl = customImageSource;
-        } else if (videoRef.current && videoRef.current.readyState >= 2) {
-          const video = videoRef.current;
-          const { canvas, dataUrl } = ocrParserService.preprocessImageCanvas(video, {
-            contrast: contrastLevel,
-            binarize: true,
-            threshold: binarizeThreshold,
-            width: video.videoWidth || 800,
-            height: video.videoHeight || 600
-          });
+      let photoDataUrl = '';
+      let preprocessedDataUrl = '';
+      const isKnownScenario = typeof customImageSource === 'string' && Boolean(explicitOcrText);
 
-          // Standard capture
-          const rawCanvas = document.createElement('canvas');
-          rawCanvas.width = video.videoWidth || 800;
-          rawCanvas.height = video.videoHeight || 600;
-          const rawCtx = rawCanvas.getContext('2d');
-          if (rawCtx) {
-            rawCtx.drawImage(video, 0, 0, rawCanvas.width, rawCanvas.height);
-            photoDataUrl = rawCanvas.toDataURL('image/jpeg', 0.88);
-          } else {
-            photoDataUrl = dataUrl;
-          }
+      if (typeof customImageSource === 'string') {
+        photoDataUrl = customImageSource;
+        preprocessedDataUrl = customImageSource;
+      } else if (videoRef.current && videoRef.current.readyState >= 2) {
+        const video = videoRef.current;
+        const { dataUrl } = ocrParserService.preprocessImageCanvas(video, {
+          contrast: contrastLevel,
+          binarize: true,
+          threshold: binarizeThreshold,
+          width: video.videoWidth || 800,
+          height: video.videoHeight || 600
+        });
 
-          preprocessedDataUrl = dataUrl;
+        // Standard capture
+        const rawCanvas = document.createElement('canvas');
+        rawCanvas.width = video.videoWidth || 800;
+        rawCanvas.height = video.videoHeight || 600;
+        const rawCtx = rawCanvas.getContext('2d');
+        if (rawCtx) {
+          rawCtx.drawImage(video, 0, 0, rawCanvas.width, rawCanvas.height);
+          photoDataUrl = rawCanvas.toDataURL('image/jpeg', 0.88);
         } else {
-          // Fallback image
-          photoDataUrl = SAMPLE_LABEL_SCENARIOS[0].samplePhotoUrl;
-          preprocessedDataUrl = photoDataUrl;
+          photoDataUrl = dataUrl;
         }
 
-        setLastScannedPreview(photoDataUrl);
-        setPreprocessedPreview(preprocessedDataUrl);
+        preprocessedDataUrl = dataUrl;
+      } else {
+        // Fallback image
+        photoDataUrl = SAMPLE_LABEL_SCENARIOS[0].samplePhotoUrl;
+        preprocessedDataUrl = photoDataUrl;
+      }
 
-        // OCR Extraction Step
-        const textToParse =
-          explicitOcrText ||
-          `MERCADO LIVRE - MERCADO ENVIOS
-DESTINATÁRIO: Beatriz Lima
-CONDOMINIO RESIDENCIAL VILLAGE AZALEIA
-BLOCO 03 - APTO 102
-RASTREIO: ML-894720194BR
-42019482710394829104820194`;
+      setLastScannedPreview(photoDataUrl);
+      setPreprocessedPreview(preprocessedDataUrl);
 
-        const parsedResult = ocrParserService.parseLabelText(
-          textToParse,
-          preprocessedDataUrl
-        );
+      let parsedResult: ExtractedLabelData | null = null;
 
-        setIsAnalyzing(false);
+      if (isKnownScenario) {
+        // Cenário de teste pré-gravado — parser local, sem custo de API
+        parsedResult = ocrParserService.parseLabelText(explicitOcrText!, preprocessedDataUrl);
+      } else {
+        setScannerStatus('Analisando etiqueta com IA (Gemini Vision)...');
+        parsedResult = await geminiOcrService.analyzeLabelPhoto(photoDataUrl);
+        if (parsedResult) {
+          parsedResult = { ...parsedResult, preprocessedImageUrl: preprocessedDataUrl };
+        }
+      }
+
+      if (!parsedResult) {
+        // Gemini indisponível/falhou — cai pro parser local com texto vazio, garante que o
+        // fluxo continua (fallback manual assume a partir daqui na tela de recepção).
+        setScannerStatus('Não foi possível ler automaticamente. Preencha manualmente.');
+        parsedResult = ocrParserService.parseLabelText('', preprocessedDataUrl);
+      } else {
         setScannerStatus('✓ Leitura OCR concluída com sucesso!');
-        sound.playSuccess();
+      }
 
-        onScanComplete(parsedResult, photoDataUrl, preprocessedDataUrl);
-      }, 500);
+      setIsAnalyzing(false);
+      sound.playSuccess();
+
+      onScanComplete(parsedResult, photoDataUrl, preprocessedDataUrl);
     },
     [contrastLevel, binarizeThreshold, onScanComplete]
   );
@@ -201,14 +214,9 @@ RASTREIO: ML-894720194BR
       const result = event.target?.result as string;
       if (result) {
         sound.playScanBeep();
-        setScannerStatus('Foto da etiqueta carregada. Executando OCR...');
-        // Run OCR with extracted simulation
-        captureAndAnalyze(
-          result,
-          `DESTINATÁRIO: Carlos Silva
-RESIDENCIAL VILLAGE AZALEIA - BLOCO 01 APT 201
-CORREIOS SEDEX - OBJETO: NL928374102BR`
-        );
+        setScannerStatus('Foto da etiqueta carregada. Executando OCR real com IA...');
+        // Foto real enviada pelo usuário — sem texto explícito, então vai pro Gemini Vision
+        captureAndAnalyze(result);
       }
     };
     reader.readAsDataURL(file);

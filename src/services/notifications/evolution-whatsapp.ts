@@ -1,23 +1,14 @@
 import { PackageItem, Unit, WhatsappDispatchStatus } from '../../types';
 
-export interface EvolutionApiConfig {
-  apiUrl?: string;
-  apiKey?: string;
-  instanceName?: string;
-}
-
+/**
+ * Cliente WhatsApp do Village Azaleia.
+ *
+ * IMPORTANTE: o envio real acontece em /api/whatsapp/send (função serverless) —
+ * a apikey da Evolution API NUNCA fica no navegador. Este serviço só monta o texto
+ * da mensagem e chama nosso próprio backend, que repassa pra Evolution API.
+ * Ver: api/whatsapp/send.ts, api/whatsapp/status.ts, api/whatsapp/connect.ts.
+ */
 export class EvolutionWhatsAppService {
-  private config: EvolutionApiConfig;
-
-  constructor(config: EvolutionApiConfig = {}) {
-    const metaEnv = typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
-    this.config = {
-      apiUrl: config.apiUrl || (metaEnv.VITE_EVOLUTION_API_URL as string) || 'https://api.evolution-api.com',
-      apiKey: config.apiKey || (metaEnv.VITE_EVOLUTION_API_KEY as string) || '',
-      instanceName: config.instanceName || (metaEnv.VITE_EVOLUTION_INSTANCE as string) || 'village-azaleia-portaria'
-    };
-  }
-
   /**
    * Builds the formatted WhatsApp message text with Village Azaleia template
    */
@@ -46,7 +37,27 @@ export class EvolutionWhatsAppService {
   }
 
   /**
-   * Dispatches WhatsApp messages to all registered phone numbers for the unit (up to 5 numbers)
+   * Envia um texto pra um número via nosso backend seguro (/api/whatsapp/send).
+   * Nunca lança — retorna status SENT/SIMULATED/FAILED, pra não travar o fluxo do app.
+   */
+  private async sendViaBackend(phone: string, text: string): Promise<'SENT' | 'FAILED'> {
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, text })
+      });
+      if (!response.ok) return 'FAILED';
+      const data = await response.json();
+      return data.status === 'SENT' ? 'SENT' : 'FAILED';
+    } catch (err) {
+      console.warn('[WhatsApp] Falha ao chamar /api/whatsapp/send:', err);
+      return 'FAILED';
+    }
+  }
+
+  /**
+   * Dispatches "encomenda chegou" messages to all registered phone numbers for the unit (up to 5 numbers)
    */
   public async dispatchToUnit(pkg: PackageItem, unit: Unit): Promise<WhatsappDispatchStatus[]> {
     const contacts = unit.residentPhones && unit.residentPhones.length > 0
@@ -63,117 +74,15 @@ export class EvolutionWhatsAppService {
     const results: WhatsappDispatchStatus[] = [];
 
     for (const contact of contacts) {
-      const recipientName = contact.label === 'Titular' 
-        ? unit.residentName 
-        : `${unit.residentName} (${contact.label})`;
-
-      const messageText = this.buildMessageText(pkg, recipientName);
-      const cleanPhone = contact.number.replace(/\D/g, '');
-      const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-
-      // If live Evolution API credentials are provided, attempt real HTTP POST
-      let isLiveSent = false;
-      if (this.config.apiUrl && this.config.apiKey && this.config.instanceName) {
-        try {
-          const endpoint = `${this.config.apiUrl.replace(/\/$/, '')}/message/sendText/${this.config.instanceName}`;
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': this.config.apiKey
-            },
-            body: JSON.stringify({
-              number: formattedPhone,
-              text: messageText,
-              options: {
-                delay: 1200,
-                presence: 'composing',
-                linkPreview: true
-              }
-            })
-          });
-
-          if (response.ok) {
-            isLiveSent = true;
-          }
-        } catch (err) {
-          console.warn('[Evolution API] Real dispatch fallback to simulation mode:', err);
-        }
-      }
-
-      results.push({
-        status: isLiveSent ? 'SENT' : 'SIMULATED',
-        recipientName,
-        label: contact.label,
-        phone: contact.number,
-        deliveredAt: new Date().toISOString(),
-        messagePreview: messageText
-      });
-    }
-
-    return results;
-  }
-
-  /**
-   * Dispatches Welcome message + LGPD terms confirmation to all registered unit phones
-   */
-  public async dispatchWelcomeToUnit(unit: Unit): Promise<WhatsappDispatchStatus[]> {
-    const contacts = unit.residentPhones && unit.residentPhones.length > 0
-      ? unit.residentPhones
-      : [
-          {
-            id: 'default-1',
-            label: 'Titular',
-            number: unit.residentPhone || '(11) 99999-0000',
-            isWhatsapp: true
-          }
-        ];
-
-    const pwaAppUrl = typeof window !== 'undefined' ? `${window.location.origin}?unit=${unit.id}&role=morador` : 'https://village-azaleia.app';
-    const results: WhatsappDispatchStatus[] = [];
-
-    for (const contact of contacts) {
       const recipientName = contact.label === 'Titular'
         ? unit.residentName
         : `${unit.residentName} (${contact.label})`;
 
-      const messageText =
-        `🌿 *CONDOMÍNIO RESIDENCIAL VILLAGE AZALEIA*\n` +
-        `✅ *Confirmação de Cadastro & Termo LGPD Aceito*\n\n` +
-        `Olá, *${recipientName}*! Seu cadastro para o *Bloco ${unit.block} - Apartamento ${unit.apartment}* foi concluído com sucesso no Sistema Inteligente de Encomendas do Village Azaleia.\n\n` +
-        `🔒 *Termo de Privacidade & LGPD (Lei 13.709/2018):*\n` +
-        `Você autorizou o tratamento dos seus contatos exclusivamente para notificações transacionais de encomendas e segurança física condominial.\n\n` +
-        `📲 *Instale o aplicativo na tela inicial do seu celular:*\n` +
-        `${pwaAppUrl}\n\n` +
-        `_A partir de agora você receberá alertas em tempo real sempre que uma entrega chegar para você!_`;
-
-      const cleanPhone = contact.number.replace(/\D/g, '');
-      const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-
-      let isLiveSent = false;
-      if (this.config.apiUrl && this.config.apiKey && this.config.instanceName) {
-        try {
-          const endpoint = `${this.config.apiUrl.replace(/\/$/, '')}/message/sendText/${this.config.instanceName}`;
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': this.config.apiKey
-            },
-            body: JSON.stringify({
-              number: formattedPhone,
-              text: messageText,
-              options: { delay: 1000, presence: 'composing', linkPreview: true }
-            })
-          });
-          if (response.ok) isLiveSent = true;
-        } catch (err) {
-          console.warn('[Evolution API] Welcome dispatch fallback:', err);
-        }
-      }
+      const messageText = this.buildMessageText(pkg, recipientName);
+      const status = await this.sendViaBackend(contact.number, messageText);
 
       results.push({
-        status: isLiveSent ? 'SENT' : 'SIMULATED',
+        status,
         recipientName,
         label: contact.label,
         phone: contact.number,
@@ -186,7 +95,7 @@ export class EvolutionWhatsAppService {
   }
 
   /**
-   * Dispatches Digital Delivery Receipt message to all registered unit phones
+   * Dispatches "encomenda retirada" (comprovante de entrega) message to all registered unit phones
    */
   public async dispatchReceiptToUnit(pkg: PackageItem, unit: Unit): Promise<WhatsappDispatchStatus[]> {
     const contacts = unit.residentPhones && unit.residentPhones.length > 0
@@ -229,33 +138,10 @@ export class EvolutionWhatsAppService {
         `${pwaAppUrl}\n\n` +
         `_Village Azaleia • Segurança e Transparência em cada entrega._`;
 
-      const cleanPhone = contact.number.replace(/\D/g, '');
-      const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-
-      let isLiveSent = false;
-      if (this.config.apiUrl && this.config.apiKey && this.config.instanceName) {
-        try {
-          const endpoint = `${this.config.apiUrl.replace(/\/$/, '')}/message/sendText/${this.config.instanceName}`;
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': this.config.apiKey
-            },
-            body: JSON.stringify({
-              number: formattedPhone,
-              text: messageText,
-              options: { delay: 1000, presence: 'composing', linkPreview: true }
-            })
-          });
-          if (response.ok) isLiveSent = true;
-        } catch (err) {
-          console.warn('[Evolution API] Receipt dispatch fallback:', err);
-        }
-      }
+      const status = await this.sendViaBackend(contact.number, messageText);
 
       results.push({
-        status: isLiveSent ? 'SENT' : 'SIMULATED',
+        status,
         recipientName,
         label: contact.label,
         phone: contact.number,

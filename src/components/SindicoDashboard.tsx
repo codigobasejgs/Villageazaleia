@@ -30,6 +30,7 @@ import {
 import { sound } from '../utils/audio';
 import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
 import { DeliveryReceiptModal } from './DeliveryReceiptModal';
+import { WhatsAppIntegrationPanel } from './WhatsAppIntegrationPanel';
 import { Printer, FileCheck } from 'lucide-react';
 
 interface SindicoDashboardProps {
@@ -338,6 +339,9 @@ export const SindicoDashboard: React.FC<SindicoDashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Integrações — Conexão do WhatsApp real (Evolution API) */}
+      <WhatsAppIntegrationPanel onShowToast={onShowToast} />
 
       {/* KPI METRIC CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

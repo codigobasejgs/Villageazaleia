@@ -1,0 +1,69 @@
+import { Carrier } from '../types';
+import { ExtractedLabelData } from './ocr-parser.service';
+
+interface GeminiLabelResponse {
+  carrier: Carrier;
+  trackingCode: string | null;
+  recipientName: string | null;
+  block: number | null;
+  apartment: number | null;
+  rawText: string;
+  confidence: number;
+  error?: string;
+}
+
+/**
+ * Chama /api/ocr/analyze-label (backend seguro, Gemini Vision) pra ler uma foto real de
+ * etiqueta e extrair transportadora, rastreio, destinatário e bloco/apto. A chave Gemini
+ * nunca sai do servidor — ver api/ocr/analyze-label.ts.
+ */
+export const geminiOcrService = {
+  async analyzeLabelPhoto(imageDataUrl: string): Promise<ExtractedLabelData | null> {
+    try {
+      const response = await fetch('/api/ocr/analyze-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: imageDataUrl })
+      });
+
+      if (!response.ok) return null;
+
+      const data: GeminiLabelResponse = await response.json();
+      if (data.error) {
+        console.warn('[Gemini OCR] Erro retornado pelo servidor:', data.error);
+        return null;
+      }
+
+      const missingFields: ExtractedLabelData['missingFields'] = [];
+      if (!data.trackingCode) missingFields.push('trackingCode');
+      if (!data.block || !data.apartment) missingFields.push('unit');
+      if (!data.recipientName) missingFields.push('recipientName');
+
+      let extractionQuality: ExtractedLabelData['extractionQuality'] = 'EXCELLENT';
+      if (missingFields.length === 0) {
+        extractionQuality = 'EXCELLENT';
+      } else if (missingFields.length === 1 && !missingFields.includes('unit')) {
+        extractionQuality = 'GOOD';
+      } else if (missingFields.includes('unit') && missingFields.length <= 2) {
+        extractionQuality = 'PARTIAL';
+      } else {
+        extractionQuality = 'POOR';
+      }
+
+      return {
+        rawText: data.rawText || '',
+        recipientName: data.recipientName,
+        block: data.block,
+        apartment: data.apartment,
+        trackingCode: data.trackingCode,
+        carrier: data.carrier,
+        carrierConfidence: data.confidence,
+        extractionQuality,
+        missingFields
+      };
+    } catch (err) {
+      console.warn('[Gemini OCR] Falha ao chamar /api/ocr/analyze-label:', err);
+      return null;
+    }
+  }
+};

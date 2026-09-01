@@ -8,6 +8,7 @@ import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
 import { PackageScannerOCR } from './PackageScannerOCR';
 import { ExtractedLabelData } from '../services/ocr-parser.service';
 import { shelfAllocatorService } from '../services/shelf-allocator.service';
+import { storageService } from '../services/storage.service';
 import { PackageIntakePayload } from './PackageIntakeFlow';
 
 interface TotemViewProps {
@@ -19,7 +20,7 @@ interface TotemViewProps {
 
 interface RegisteredTicket {
   protocol: string;
-  block: number;
+  block: string;
   apartment: number;
   residentName: string;
   carrier: Carrier;
@@ -71,28 +72,39 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
     setTrackingInput(`${carrier.slice(0, 3).toUpperCase()}-${randNum}`);
   };
 
-  const handleConfirmDelivery = () => {
+  const handleConfirmDelivery = async () => {
     if (!deliveryGuyName.trim()) {
       onShowToast('Informe seu nome ou a transportadora antes de confirmar.', 'warning');
       return;
     }
-    if (!matchedUnit) {
-      onShowToast('Digite um Bloco e Apartamento válidos do condomínio.', 'warning');
+    const block = blockInput.trim();
+    const apartment = parseInt(apartmentInput, 10);
+    if (!block || !apartment) {
+      onShowToast('Informe o Bloco e o Apartamento de destino da encomenda.', 'warning');
       return;
     }
 
     const tracking = trackingInput.trim() || `PKG-${Date.now().toString().slice(-6)}`;
     const shelf = shelfAllocatorService.allocateBestSlot(packages, carrier);
 
+    // Upload scanned photo to Supabase Storage if present
+    let finalPhotoUrl = scannedPhoto || SAMPLE_PACKAGE_PHOTOS[0];
+    if (scannedPhoto && scannedPhoto.startsWith('data:')) {
+      finalPhotoUrl = await storageService.uploadFile('packages', scannedPhoto);
+    }
+
+    const residentName = matchedUnit?.residentName || `Morador Bloco ${block} Apto ${apartment}`;
+    const unitId = matchedUnit?.id || `B${String(block).padStart(2, '0')}-A${apartment}`;
+
     onAddPackage({
       trackingCode: tracking,
-      unitId: matchedUnit.id,
-      block: matchedUnit.block,
-      apartment: matchedUnit.apartment,
-      residentName: matchedUnit.residentName,
+      unitId,
+      block,
+      apartment,
+      residentName,
       carrier,
       shelf,
-      photoUrl: scannedPhoto || SAMPLE_PACKAGE_PHOTOS[0],
+      photoUrl: finalPhotoUrl,
       registeredVia: 'TOTEM_ENTREGADOR',
       deliveryGuyName: deliveryGuyName.trim(),
       operatorName: 'Totem Central de Autoatendimento'
@@ -100,9 +112,9 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
 
     setTicket({
       protocol: `PROT-VA-${Math.floor(100000 + Math.random() * 900000)}`,
-      block: matchedUnit.block,
-      apartment: matchedUnit.apartment,
-      residentName: matchedUnit.residentName,
+      block,
+      apartment,
+      residentName,
       carrier,
       trackingCode: tracking,
       shelf

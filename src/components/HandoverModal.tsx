@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { PackageItem, Unit } from '../types';
 import { SignaturePad } from './SignaturePad';
 import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
+import { storageService } from '../services/storage.service';
 import { sound } from '../utils/audio';
 import {
   CheckCircle2,
@@ -82,7 +83,7 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
     onShowToast('Foto do momento da entrega registrada!', 'info');
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!pickedUpBy.trim()) {
       sound.playError();
       onShowToast('Por favor, informe o nome de quem está retirando.', 'warning');
@@ -98,16 +99,24 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
     setIsSubmitting(true);
     sound.playSuccess();
 
-    onConfirmHandover(
-      pkg.id,
-      pickedUpBy.trim(),
-      operator.trim() || 'Portaria',
-      signatureDataUrl,
-      handoverPhoto
-    );
+    try {
+      // Upload signature & handover photo to Supabase Storage Bucket in parallel
+      const [finalSignatureUrl, finalPhotoUrl] = await Promise.all([
+        signatureDataUrl ? storageService.uploadFile('signatures', signatureDataUrl) : Promise.resolve(null),
+        handoverPhoto ? storageService.uploadFile('handovers', handoverPhoto) : Promise.resolve(null)
+      ]);
 
-    setIsSubmitting(false);
-    onClose();
+      onConfirmHandover(
+        pkg.id,
+        pickedUpBy.trim(),
+        operator.trim() || 'Portaria',
+        finalSignatureUrl || signatureDataUrl,
+        finalPhotoUrl || handoverPhoto
+      );
+    } finally {
+      setIsSubmitting(false);
+      onClose();
+    }
   };
 
   return (

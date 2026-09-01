@@ -9,6 +9,7 @@ import { PackageItem, ActivityLog, AuthSession, Unit, StaffAccount, PushNotifica
 import { ALL_UNITS, INITIAL_PACKAGES, INITIAL_LOGS } from './data/mockData';
 import { generateSeedStaffAccounts } from './data/staffAccounts';
 import * as authService from './services/auth.service';
+import { dbService } from './services/db.service';
 import { AppHeader } from './components/AppHeader';
 import { PortariaView } from './components/PortariaView';
 import { MoradorView } from './components/MoradorView';
@@ -36,39 +37,27 @@ export default function App() {
   const [preAuthView, setPreAuthView] = useState<PreAuthView>('landing');
   const [totemMode, setTotemMode] = useState(false);
 
-  // 2. Units state with localStorage persistence (360 units with up to 5 contact phones each)
+  // 2. Units state com cache local inicial e sync Supabase
   const [units, setUnits] = useState<Unit[]>(() => {
     try {
       const saved = localStorage.getItem('village_azaleia_units');
-      if (saved) {
-        return JSON.parse(saved);
-      }
+      if (saved) return JSON.parse(saved);
     } catch {
       // Fallback
     }
     return ALL_UNITS;
   });
 
-  // 3. Staff accounts (Portaria/Síndico) — seedadas uma vez (hash assíncrono via Web Crypto)
-  // e persistidas do mesmo jeito que units/packages.
+  // 3. Staff accounts (Portaria/Síndico)
   const [staffAccounts, setStaffAccounts] = useState<StaffAccount[]>(() => {
     try {
       const saved = localStorage.getItem('village_azaleia_staff');
-      if (saved) {
-        return JSON.parse(saved);
-      }
+      if (saved) return JSON.parse(saved);
     } catch {
       // Fallback
     }
     return [];
   });
-
-  useEffect(() => {
-    if (staffAccounts.length === 0) {
-      generateSeedStaffAccounts().then(setStaffAccounts);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // 4. Sound state
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -76,26 +65,22 @@ export default function App() {
     return saved !== null ? saved === 'true' : true;
   });
 
-  // 5. Packages state with localStorage persistence
+  // 5. Packages state com cache local inicial e sync Supabase
   const [packages, setPackages] = useState<PackageItem[]>(() => {
     try {
       const saved = localStorage.getItem('village_azaleia_packages');
-      if (saved) {
-        return JSON.parse(saved);
-      }
+      if (saved) return JSON.parse(saved);
     } catch {
       // Fallback
     }
     return INITIAL_PACKAGES;
   });
 
-  // 6. Activity logs state with localStorage persistence
+  // 6. Activity logs state com cache local e sync Supabase
   const [logs, setLogs] = useState<ActivityLog[]>(() => {
     try {
       const saved = localStorage.getItem('village_azaleia_logs');
-      if (saved) {
-        return JSON.parse(saved);
-      }
+      if (saved) return JSON.parse(saved);
     } catch {
       // Fallback
     }
@@ -106,9 +91,7 @@ export default function App() {
   const [multichannelReports, setMultichannelReports] = useState<MultichannelDispatchReport[]>(() => {
     try {
       const saved = localStorage.getItem('village_azaleia_multichannel_reports');
-      if (saved) {
-        return JSON.parse(saved);
-      }
+      if (saved) return JSON.parse(saved);
     } catch {
       // Fallback
     }
@@ -119,9 +102,7 @@ export default function App() {
   const [pushNotifications, setPushNotifications] = useState<PushNotification[]>(() => {
     try {
       const saved = localStorage.getItem('village_azaleia_push_notifications');
-      if (saved) {
-        return JSON.parse(saved);
-      }
+      if (saved) return JSON.parse(saved);
     } catch {
       // Fallback
     }
@@ -131,7 +112,7 @@ export default function App() {
         title: 'Nova encomenda recebida para sua unidade!',
         body: 'Morador(a) Beatriz Lima, seu pacote da Amazon (AMZ-BR-49201948) foi guardado na Estante A1. Apresente seu QR Code na Portaria.',
         packageId: 'pkg-1',
-        block: 3,
+        block: '3',
         apartment: 102,
         residentName: 'Beatriz Lima',
         carrier: 'Amazon',
@@ -147,6 +128,63 @@ export default function App() {
 
   // 9. Toast notifications state
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  // =========================================================================
+  // SUPABASE REALTIME & INITIAL FETCH
+  // =========================================================================
+  useEffect(() => {
+    // 1. Fetch initial remote data from Supabase
+    async function initSupabaseData() {
+      // Fetch Units (inicia com os cadastrados no banco)
+      const remoteUnits = await dbService.fetchUnits();
+      if (remoteUnits) {
+        setUnits(remoteUnits);
+      }
+
+      // Fetch Staff
+      const remoteStaff = await dbService.fetchStaffAccounts();
+      if (remoteStaff && remoteStaff.length > 0) {
+        setStaffAccounts(remoteStaff);
+      } else {
+        const seedStaff = await generateSeedStaffAccounts();
+        setStaffAccounts(seedStaff);
+      }
+
+      // Fetch Packages
+      const remotePackages = await dbService.fetchPackages();
+      if (remotePackages) {
+        setPackages(remotePackages);
+      }
+
+      // Fetch Logs
+      const remoteLogs = await dbService.fetchLogs();
+      if (remoteLogs) {
+        setLogs(remoteLogs);
+      }
+    }
+
+    initSupabaseData();
+
+    // 2. Realtime Subscriptions (Sync across devices)
+    const unsubscribe = dbService.subscribeAll({
+      onPackageChange: async () => {
+        const refreshed = await dbService.fetchPackages();
+        if (refreshed) setPackages(refreshed);
+      },
+      onUnitChange: async () => {
+        const refreshed = await dbService.fetchUnits();
+        if (refreshed) setUnits(refreshed);
+      },
+      onLogChange: async () => {
+        const refreshed = await dbService.fetchLogs();
+        if (refreshed) setLogs(refreshed);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // 10. Deep link & Dev testing URL params: "?role=portaria|morador|totem|sindico&unit=B03-A102"
   useEffect(() => {
@@ -184,34 +222,29 @@ export default function App() {
     localStorage.setItem('village_azaleia_sound', String(soundEnabled));
   }, [soundEnabled]);
 
-  // Sync units to localStorage
+  // Local storage backups
   useEffect(() => {
     localStorage.setItem('village_azaleia_units', JSON.stringify(units));
   }, [units]);
 
-  // Sync staff accounts to localStorage
   useEffect(() => {
     if (staffAccounts.length > 0) {
       localStorage.setItem('village_azaleia_staff', JSON.stringify(staffAccounts));
     }
   }, [staffAccounts]);
 
-  // Sync packages to localStorage
   useEffect(() => {
     localStorage.setItem('village_azaleia_packages', JSON.stringify(packages));
   }, [packages]);
 
-  // Sync logs to localStorage
   useEffect(() => {
     localStorage.setItem('village_azaleia_logs', JSON.stringify(logs));
   }, [logs]);
 
-  // Sync multichannel reports to localStorage
   useEffect(() => {
     localStorage.setItem('village_azaleia_multichannel_reports', JSON.stringify(multichannelReports));
   }, [multichannelReports]);
 
-  // Sync push notifications to localStorage
   useEffect(() => {
     localStorage.setItem('village_azaleia_push_notifications', JSON.stringify(pushNotifications));
   }, [pushNotifications]);
@@ -226,11 +259,7 @@ export default function App() {
     }, 4500);
   };
 
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  // New PWA build available (registered in main.tsx via virtual:pwa-register)
+  // PWA build update notification
   useEffect(() => {
     const handleUpdateReady = () => {
       showToast('Nova versão do app disponível! Atualize a página para aplicar.', 'info');
@@ -261,7 +290,7 @@ export default function App() {
     sound.playNotification();
   };
 
-  // Add new package (Portaria or Totem) & Trigger Multichannel Notifications
+  // Add new package (Portaria or Totem) & Trigger Supabase Insert + Multichannel Notifications
   const handleAddPackage = async (
     pkgData: Omit<PackageItem, 'id' | 'status' | 'receivedAt' | 'qrToken' | 'registeredVia'> & {
       registeredVia?: 'PORTARIA' | 'TOTEM_ENTREGADOR';
@@ -280,9 +309,10 @@ export default function App() {
       registeredVia: pkgData.registeredVia || 'PORTARIA'
     };
 
+    // Optimistic state update
     setPackages((prev) => [newPackage, ...prev]);
 
-    // Create log entry for physical package entry
+    // Create log entry
     const newLog: ActivityLog = {
       id: `log-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -296,12 +326,16 @@ export default function App() {
 
     setLogs((prev) => [newLog, ...prev]);
 
+    // Push to Supabase Cloud DB
+    dbService.insertPackage(newPackage);
+    dbService.insertLog(newLog);
+
     // Push Notification Banner UI
     triggerPushNotification(newPackage);
 
     // Target Unit lookup for Multichannel dispatch (WhatsApp + Resend + Web Push)
     const targetUnit =
-      units.find((u) => u.block === newPackage.block && u.apartment === newPackage.apartment) || {
+      units.find((u) => String(u.block) === String(newPackage.block) && u.apartment === newPackage.apartment) || {
         id: `B${String(newPackage.block).padStart(2, '0')}-A${newPackage.apartment}`,
         block: newPackage.block,
         apartment: newPackage.apartment,
@@ -331,35 +365,10 @@ export default function App() {
       };
 
       setLogs((prev) => [multichannelLog, ...prev]);
+      dbService.insertLog(multichannelLog);
     } catch (err) {
       console.warn('[Multichannel Dispatch Error]', err);
     }
-  };
-
-  // Test Push trigger for any unit
-  const handleTriggerTestPush = (unit: Unit) => {
-    const carriers = ['Mercado Livre', 'Amazon', 'Correios', 'Shopee', 'Loggi'] as const;
-    const carrier = carriers[Math.floor(Math.random() * carriers.length)];
-    const trackingCode = `TEST-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    const simulatedPackage: PackageItem = {
-      id: `pkg-test-${Date.now()}`,
-      trackingCode,
-      unitId: unit.id,
-      block: unit.block,
-      apartment: unit.apartment,
-      residentName: unit.residentName,
-      carrier,
-      shelf: { shelf: 'A', level: 1 },
-      photoUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=400&q=80',
-      status: 'ARMAZENADA',
-      receivedAt: new Date().toISOString(),
-      qrToken: `QR-B${String(unit.block).padStart(2, '0')}A${unit.apartment}-TEST`,
-      registeredVia: 'PORTARIA'
-    };
-
-    triggerPushNotification(simulatedPackage);
-    showToast(`Push disparado para Bloco ${unit.block} Apt ${unit.apartment} (${unit.residentName})!`, 'success');
   };
 
   // Pickup / Checkout package with digital signature, handover photo, and multichannel receipt dispatch
@@ -388,9 +397,21 @@ export default function App() {
       receiptProtocol: protocol
     };
 
+    // Optimistic update
     setPackages((prev) =>
       prev.map((p) => (p.id === pkgId ? updatedPackage : p))
     );
+
+    // Save to Supabase DB
+    dbService.updatePackage(pkgId, {
+      status: 'RETIRADA',
+      pickedUpAt: now,
+      pickedUpBy: pickedUpBy || targetPkg.residentName,
+      operatorName: operatorName || targetPkg.operatorName,
+      signatureUrl: signatureUrl || null,
+      handoverPhotoUrl: handoverPhotoUrl || null,
+      receiptProtocol: protocol
+    });
 
     // Audit Log 1: RETIRADA
     const newLog: ActivityLog = {
@@ -417,6 +438,8 @@ export default function App() {
     };
 
     setLogs((prev) => [receiptLog, newLog, ...prev]);
+    dbService.insertLog(newLog);
+    dbService.insertLog(receiptLog);
 
     // Confetti celebration on delivery
     try {
@@ -431,7 +454,7 @@ export default function App() {
 
     // Lookup unit to dispatch delivery receipt via WhatsApp and Email
     const targetUnit =
-      units.find((u) => u.block === targetPkg.block && u.apartment === targetPkg.apartment) || {
+      units.find((u) => String(u.block) === String(targetPkg.block) && u.apartment === targetPkg.apartment) || {
         id: `B${String(targetPkg.block).padStart(2, '0')}-A${targetPkg.apartment}`,
         block: targetPkg.block,
         apartment: targetPkg.apartment,
@@ -451,22 +474,27 @@ export default function App() {
     }
   };
 
-  // Update a unit profile (resident name, phones up to 5, email, senha). Se o morador logado
-  // mudar de bloco/apto, mantém a sessão apontando pra unidade nova.
+  // Update / Register a unit profile
   const handleUpdateUnit = (updatedUnit: Unit) => {
-    setUnits((prev) =>
-      prev.map((u) => (u.id === updatedUnit.id || (u.block === updatedUnit.block && u.apartment === updatedUnit.apartment) ? updatedUnit : u))
-    );
-    setSession((prev) => (prev && prev.type === 'morador' ? { type: 'morador', unitId: updatedUnit.id } : prev));
+    setUnits((prev) => {
+      const exists = prev.some((u) => u.id === updatedUnit.id || (String(u.block) === String(updatedUnit.block) && u.apartment === updatedUnit.apartment));
+      if (exists) {
+        return prev.map((u) => (u.id === updatedUnit.id || (String(u.block) === String(updatedUnit.block) && u.apartment === updatedUnit.apartment) ? updatedUnit : u));
+      }
+      return [updatedUnit, ...prev];
+    });
+    setSession({ type: 'morador', unitId: updatedUnit.id });
+
+    // Sync to Supabase Cloud DB
+    dbService.upsertUnit(updatedUnit);
   };
 
-  // Push Notification Banner click: nunca pula pro app do morador de outra unidade
-  // (isso furaria o isolamento de sessão) — só dá contexto extra se for a própria sessão.
+  // Push Notification Banner click
   const handleOpenResidentAppFromPush = (notification: PushNotification) => {
     setActivePushPopup(null);
     if (session?.type === 'morador') {
       const myUnit = units.find((u) => u.id === session.unitId);
-      if (myUnit && myUnit.block === notification.block && myUnit.apartment === notification.apartment) {
+      if (myUnit && String(myUnit.block) === String(notification.block) && myUnit.apartment === notification.apartment) {
         showToast('Essa é a sua encomenda! Veja os detalhes na aba "Para Retirar".', 'info');
         return;
       }
@@ -474,8 +502,7 @@ export default function App() {
     showToast('Notificação enviada ao morador via WhatsApp, E-mail e Push.', 'info');
   };
 
-  // Reset to initial mock data (QA/demo) — desloga, já que a sessão atual pode
-  // apontar pra uma unidade/cadastro que deixou de existir depois do reset.
+  // Reset to initial mock data (QA/demo)
   const handleResetData = () => {
     setUnits(ALL_UNITS);
     setPackages(INITIAL_PACKAGES);
@@ -516,7 +543,8 @@ export default function App() {
       showToast('Alternado para visão do Síndico', 'info');
     } else if (targetRole === 'morador') {
       setTotemMode(false);
-      const currentMoradorId = session?.type === 'morador' ? session.unitId : units[0]?.id || 'B03-A102';
+      const registeredUnit = units.find((u) => Boolean(u.passwordHash) || Boolean(u.registeredAt));
+      const currentMoradorId = session?.type === 'morador' ? session.unitId : registeredUnit?.id || units[0]?.id || 'B03-A102';
       setSession({ type: 'morador', unitId: currentMoradorId });
       showToast('Alternado para PWA do Morador', 'info');
     }
@@ -624,8 +652,6 @@ export default function App() {
                 activeUnitId={session.unitId}
                 onUpdateUnit={handleUpdateUnit}
                 notifications={pushNotifications}
-                multichannelReports={multichannelReports}
-                onTriggerTestPush={handleTriggerTestPush}
                 onShowToast={showToast}
               />
             )}
@@ -642,31 +668,23 @@ export default function App() {
         </div>
       )}
 
-      {/* Toast Notification Container — sempre visível, em qualquer tela (login incluso) */}
+      {/* Toast Notification Container */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto p-4 rounded-2xl shadow-xl border backdrop-blur-md flex items-start justify-between gap-3 text-xs sm:text-sm animate-in slide-in-from-bottom-5 transition-all ${
+            className={`p-4 rounded-2xl shadow-xl border flex items-center gap-3 pointer-events-auto transform transition-all duration-300 animate-in slide-in-from-bottom-5 text-xs font-semibold ${
               toast.type === 'success'
-                ? 'bg-[#0D3823]/95 border-[#D4AF37]/50 text-white shadow-emerald-950/30'
+                ? 'bg-[#061D12] text-white border-[#D4AF37] ring-1 ring-[#D4AF37]/50'
                 : toast.type === 'warning'
-                ? 'bg-[#880E4F]/95 border-[#FFF2B2]/50 text-pink-50 shadow-pink-950/30'
-                : 'bg-[#061D12]/95 border-[#D4AF37]/40 text-emerald-100 shadow-black/40'
+                ? 'bg-amber-50 text-amber-900 border-amber-300'
+                : 'bg-[#0D3823] text-white border-[#D4AF37]/40'
             }`}
           >
-            <div className="flex items-start gap-2.5">
-              {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-[#D4AF37] shrink-0 mt-0.5" />}
-              {toast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-[#FF80AB] shrink-0 mt-0.5" />}
-              {toast.type === 'info' && <Info className="w-5 h-5 text-[#FFF2B2] shrink-0 mt-0.5" />}
-              <span className="font-medium leading-snug">{toast.message}</span>
-            </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="text-white/60 hover:text-white p-0.5 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-[#D4AF37] shrink-0" />}
+            {toast.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />}
+            {toast.type === 'info' && <Info className="w-5 h-5 text-[#FFF2B2] shrink-0" />}
+            <span className="flex-1 leading-snug">{toast.message}</span>
           </div>
         ))}
       </div>
