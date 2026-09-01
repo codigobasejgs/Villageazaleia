@@ -511,22 +511,6 @@ export default function App() {
     showToast('Notificação enviada ao morador via WhatsApp, E-mail e Push.', 'info');
   };
 
-  // Reset to initial mock data (QA/demo)
-  const handleResetData = () => {
-    setUnits(ALL_UNITS);
-    setPackages(INITIAL_PACKAGES);
-    setLogs(INITIAL_LOGS);
-    setMultichannelReports([]);
-    localStorage.removeItem('village_azaleia_units');
-    localStorage.removeItem('village_azaleia_packages');
-    localStorage.removeItem('village_azaleia_logs');
-    localStorage.removeItem('village_azaleia_multichannel_reports');
-    localStorage.removeItem('village_azaleia_push_notifications');
-    setSession(null);
-    setPreAuthView('landing');
-    showToast('Dados, unidades e encomendas restaurados para o padrão de demonstração!', 'success');
-  };
-
   const handleMoradorAuthSuccess = (unit: Unit) => {
     setSession({ type: 'morador', unitId: unit.id });
     showToast(`Bem-vindo(a), ${unit.residentName}!`, 'success');
@@ -535,28 +519,6 @@ export default function App() {
   const handleStaffAuthSuccess = (staff: StaffAccount) => {
     setSession({ type: staff.role, staffId: staff.id });
     showToast(`Bem-vindo(a), ${staff.name}!`, 'success');
-  };
-
-  const handleSwitchRole = (targetRole: 'portaria' | 'morador' | 'totem' | 'sindico') => {
-    if (targetRole === 'totem') {
-      setTotemMode(true);
-    } else if (targetRole === 'portaria') {
-      setTotemMode(false);
-      const portariaAccount = staffAccounts.find((s) => s.role === 'portaria') || { id: 'staff-portaria-1', name: 'Silvio Portaria', role: 'portaria' as const };
-      setSession({ type: 'portaria', staffId: portariaAccount.id });
-      showToast('Alternado para visão da Portaria', 'info');
-    } else if (targetRole === 'sindico') {
-      setTotemMode(false);
-      const sindicoAccount = staffAccounts.find((s) => s.role === 'sindico') || { id: 'staff-sindico-1', name: 'Marcos Síndico', role: 'sindico' as const };
-      setSession({ type: 'sindico', staffId: sindicoAccount.id });
-      showToast('Alternado para visão do Síndico', 'info');
-    } else if (targetRole === 'morador') {
-      setTotemMode(false);
-      const registeredUnit = units.find((u) => Boolean(u.passwordHash) || Boolean(u.registeredAt));
-      const currentMoradorId = session?.type === 'morador' ? session.unitId : registeredUnit?.id || units[0]?.id || 'B03-A102';
-      setSession({ type: 'morador', unitId: currentMoradorId });
-      showToast('Alternado para PWA do Morador', 'info');
-    }
   };
 
   const handleLogout = () => {
@@ -636,9 +598,7 @@ export default function App() {
             pendingCount={session.type === 'portaria' ? pendingCount : undefined}
             soundEnabled={soundEnabled}
             onToggleSound={() => setSoundEnabled(!soundEnabled)}
-            onResetData={handleResetData}
             onLogout={handleLogout}
-            onSwitchRole={handleSwitchRole}
           />
 
           {/* 3. Main Content Area according to the logged-in role */}
