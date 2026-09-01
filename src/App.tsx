@@ -333,19 +333,30 @@ export default function App() {
     // Push Notification Banner UI
     triggerPushNotification(newPackage);
 
-    // Target Unit lookup for Multichannel dispatch (WhatsApp + Resend + Web Push)
-    const targetUnit =
-      units.find((u) => String(u.block) === String(newPackage.block) && u.apartment === newPackage.apartment) || {
-        id: `B${String(newPackage.block).padStart(2, '0')}-A${newPackage.apartment}`,
-        block: newPackage.block,
-        apartment: newPackage.apartment,
-        residentName: newPackage.residentName,
-        residentPhone: '(11) 98765-4321',
-        residentPhones: [
-          { id: 'p1', label: 'Titular', number: '(11) 98765-4321', isWhatsapp: true }
-        ],
-        residentEmail: `${newPackage.residentName.toLowerCase().replace(/\s+/g, '.')}@email.com`
+    // Target Unit lookup for Multichannel dispatch (WhatsApp + Resend + Web Push).
+    // IMPORTANTE: só dispara pra um morador com contato REAL cadastrado — nunca inventa
+    // telefone/e-mail falso pra "fingir" que enviou (isso não chegava em lugar nenhum).
+    const targetUnit = units.find((u) => String(u.block) === String(newPackage.block) && u.apartment === newPackage.apartment);
+
+    if (!targetUnit) {
+      const noContactLog: ActivityLog = {
+        id: `log-notif-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        packageId: newId,
+        trackingCode: newPackage.trackingCode,
+        unitString: `Bloco ${newPackage.block} - Apt ${newPackage.apartment}`,
+        action: 'NOTIFICACAO_MULTICANAL',
+        description: 'Morador ainda não tem cadastro (WhatsApp/e-mail) — nenhum disparo automático foi enviado. Avise manualmente.',
+        operator: 'Sistema Multicanal Village Azaleia'
       };
+      setLogs((prev) => [noContactLog, ...prev]);
+      dbService.insertLog(noContactLog);
+      showToast(
+        `Encomenda registrada para Bloco ${newPackage.block} Apt ${newPackage.apartment}, mas o morador ainda não tem WhatsApp/e-mail cadastrado. Avise manualmente!`,
+        'warning'
+      );
+      return;
+    }
 
     try {
       // Execute Multichannel Dispatch across Evolution API, Resend and Web Push
@@ -452,19 +463,17 @@ export default function App() {
       // Ignore
     }
 
-    // Lookup unit to dispatch delivery receipt via WhatsApp and Email
-    const targetUnit =
-      units.find((u) => String(u.block) === String(targetPkg.block) && u.apartment === targetPkg.apartment) || {
-        id: `B${String(targetPkg.block).padStart(2, '0')}-A${targetPkg.apartment}`,
-        block: targetPkg.block,
-        apartment: targetPkg.apartment,
-        residentName: targetPkg.residentName,
-        residentPhone: '(11) 98765-4321',
-        residentPhones: [
-          { id: 'p1', label: 'Titular', number: '(11) 98765-4321', isWhatsapp: true }
-        ],
-        residentEmail: `${targetPkg.residentName.toLowerCase().replace(/\s+/g, '.')}@email.com`
-      };
+    // Lookup unit to dispatch delivery receipt via WhatsApp and Email.
+    // Mesma regra: só dispara pra contato real cadastrado, nunca inventa telefone/e-mail falso.
+    const targetUnit = units.find((u) => String(u.block) === String(targetPkg.block) && u.apartment === targetPkg.apartment);
+
+    if (!targetUnit) {
+      showToast(
+        `Baixa confirmada, mas o morador do Bloco ${targetPkg.block} Apt ${targetPkg.apartment} ainda não tem WhatsApp/e-mail cadastrado — recibo não pôde ser enviado automaticamente.`,
+        'warning'
+      );
+      return;
+    }
 
     try {
       const receiptReport = await multichannelService.dispatchDeliveryReceipt(updatedPackage, targetUnit);
