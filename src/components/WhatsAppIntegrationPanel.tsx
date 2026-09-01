@@ -31,8 +31,18 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch('/api/whatsapp/status');
-      const data: WhatsAppStatus = await res.json();
+      // Timeout no PRÓPRIO navegador: se o servidor nunca responder por qualquer motivo,
+      // não pode ficar "Verificando..." pra sempre sem nunca mostrar nada.
+      const res = await fetch('/api/whatsapp/status', { signal: AbortSignal.timeout(20000) });
+      const rawText = await res.text();
+      let data: WhatsAppStatus;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        setDebugInfo(`/api/whatsapp/status não retornou JSON (HTTP ${res.status}):\n\n${rawText.slice(0, 1500)}`);
+        setStatus({ connected: false, exists: false, error: 'Resposta inválida do servidor.' });
+        return null;
+      }
       setStatus(data);
       if (data.connected) {
         setQrCodeBase64(null);
@@ -43,7 +53,13 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
         }
       }
       return data;
-    } catch (err) {
+    } catch (err: any) {
+      const isTimeout = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+      setDebugInfo(
+        isTimeout
+          ? '/api/whatsapp/status não respondeu em 20s (timeout no navegador). A função serverless pode estar travando ou não sendo executada no Vercel.'
+          : `Falha ao chamar /api/whatsapp/status: ${err?.message || String(err)}`
+      );
       setStatus({ connected: false, exists: false, error: 'Falha ao consultar status.' });
       return null;
     } finally {
@@ -64,7 +80,7 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
     setDebugInfo(null);
     sound.playScanBeep();
     try {
-      const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
+      const res = await fetch('/api/whatsapp/connect', { method: 'POST', signal: AbortSignal.timeout(30000) });
 
       if (!res.ok) {
         const rawText = await res.text();
@@ -123,7 +139,12 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
         }, 3000);
       }
     } catch (err: any) {
-      setDebugInfo(`Exceção no navegador: ${err?.message || String(err)}`);
+      const isTimeout = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+      setDebugInfo(
+        isTimeout
+          ? '/api/whatsapp/connect não respondeu em 30s (timeout no navegador). A função serverless pode estar travando ou não sendo executada no Vercel — confira os logs em Deployments → Functions no dashboard do Vercel.'
+          : `Exceção no navegador: ${err?.message || String(err)}`
+      );
       onShowToast('Erro de rede ao conectar com o WhatsApp.', 'warning');
     } finally {
       setIsConnecting(false);
