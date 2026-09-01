@@ -105,11 +105,13 @@ export default async function handler(request: Request): Promise<Response> {
     const qrCodeBase64 = findBase64QrCode(connectData);
 
     if (!qrCodeBase64) {
-      // Pode significar que já está conectado (sem necessidade de QR novo)
-      return new Response(JSON.stringify({ status: 'ok', qrCodeBase64: null, alreadyConnected: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      // Pode significar que já está conectado (sem necessidade de QR novo) — mas também pode
+      // ser um formato de resposta inesperado da Evolution API. Manda os dados crus junto pra
+      // dar pra diagnosticar sem precisar reproduzir às cegas.
+      return new Response(
+        JSON.stringify({ status: 'ok', qrCodeBase64: null, alreadyConnected: true, debugRawResponse: connectData }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     return new Response(JSON.stringify({ status: 'ok', qrCodeBase64, alreadyConnected: false }), {

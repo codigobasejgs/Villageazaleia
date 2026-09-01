@@ -24,6 +24,9 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
+  // Diagnóstico visível — mostra a resposta crua quando algo sai diferente do esperado,
+  // pra nunca mais precisar reproduzir um problema "às cegas".
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStatus = async () => {
@@ -33,6 +36,7 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
       setStatus(data);
       if (data.connected) {
         setQrCodeBase64(null);
+        setDebugInfo(null);
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
@@ -57,20 +61,41 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
 
   const handleConnect = async () => {
     setIsConnecting(true);
+    setDebugInfo(null);
     sound.playScanBeep();
     try {
       const res = await fetch('/api/whatsapp/connect', { method: 'POST' });
+
+      if (!res.ok) {
+        const rawText = await res.text();
+        setDebugInfo(`HTTP ${res.status}: ${rawText.slice(0, 1500)}`);
+        onShowToast(`Erro ${res.status} ao conectar. Veja o detalhe técnico abaixo do QR Code.`, 'warning');
+        setIsConnecting(false);
+        return;
+      }
+
       const data = await res.json();
 
       if (data.status === 'error') {
+        setDebugInfo(JSON.stringify(data, null, 2));
         onShowToast(data.error || 'Erro ao conectar com a Evolution API.', 'warning');
         setIsConnecting(false);
         return;
       }
 
-      if (data.alreadyConnected) {
-        onShowToast('WhatsApp já está conectado!', 'success');
-        await fetchStatus();
+      if (data.alreadyConnected && !data.qrCodeBase64) {
+        // Pode ser "já conectado" de verdade, OU o servidor não achou o QR na resposta da
+        // Evolution API (formato inesperado) — se veio debugRawResponse, mostra pra investigar.
+        if (data.debugRawResponse) {
+          setDebugInfo(
+            'O servidor não encontrou o QR Code na resposta da Evolution API. Resposta crua recebida:\n\n' +
+              JSON.stringify(data.debugRawResponse, null, 2).slice(0, 2000)
+          );
+          onShowToast('QR Code não veio no formato esperado. Veja o detalhe técnico abaixo.', 'warning');
+        } else {
+          onShowToast('WhatsApp já está conectado!', 'success');
+          await fetchStatus();
+        }
         setIsConnecting(false);
         return;
       }
@@ -97,7 +122,8 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
           }
         }, 3000);
       }
-    } catch (err) {
+    } catch (err: any) {
+      setDebugInfo(`Exceção no navegador: ${err?.message || String(err)}`);
       onShowToast('Erro de rede ao conectar com o WhatsApp.', 'warning');
     } finally {
       setIsConnecting(false);
@@ -176,6 +202,17 @@ export const WhatsAppIntegrationPanel: React.FC<WhatsAppIntegrationPanelProps> =
               <QrCode className={`w-5 h-5 text-[#D4AF37] ${isConnecting ? 'animate-pulse' : ''}`} />
               <span>{isConnecting ? 'Gerando QR Code...' : 'Conectar WhatsApp'}</span>
             </button>
+          )}
+
+          {debugInfo && (
+            <div className="p-3 rounded-xl bg-slate-900 border border-slate-700 space-y-1.5">
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                Detalhe técnico (copie e envie se precisar de suporte)
+              </span>
+              <pre className="text-[10px] text-slate-300 font-mono whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
+                {debugInfo}
+              </pre>
+            </div>
           )}
         </div>
       )}
