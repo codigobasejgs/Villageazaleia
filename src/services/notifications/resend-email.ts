@@ -1,19 +1,27 @@
 import { PackageItem, Unit, EmailDispatchStatus } from '../../types';
 
-export interface ResendConfig {
-  apiKey?: string;
-  fromEmail?: string;
-}
+const SEND_TIMEOUT_MS = 20000;
 
 export class ResendEmailService {
-  private config: ResendConfig;
-
-  constructor(config: ResendConfig = {}) {
-    const metaEnv = typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env : {};
-    this.config = {
-      apiKey: config.apiKey || (metaEnv.VITE_RESEND_API_KEY as string) || '',
-      fromEmail: config.fromEmail || 'portaria@villageazaleia.com.br'
-    };
+  /**
+   * Envia via o backend (/api/email/send) — a apikey da Resend nunca fica no navegador.
+   * Mesmo padrão de segurança usado pro WhatsApp (evolution-whatsapp.ts).
+   */
+  private async sendViaBackend(to: string, subject: string, html: string): Promise<boolean> {
+    try {
+      const response = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject, html }),
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS)
+      });
+      if (!response.ok) return false;
+      const data = await response.json();
+      return data.status === 'SENT';
+    } catch (err) {
+      console.warn('[Resend] Falha ao chamar /api/email/send:', err);
+      return false;
+    }
   }
 
   /**
@@ -170,31 +178,7 @@ export class ResendEmailService {
     const subject = `📦 Sua encomenda ${pkg.carrier} chegou! [Bloco ${pkg.block} Apt ${pkg.apartment}]`;
     const recipientEmail = unit.residentEmail || 'morador@villageazaleia.com.br';
 
-    let isLiveSent = false;
-
-    if (this.config.apiKey) {
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.apiKey}`
-          },
-          body: JSON.stringify({
-            from: this.config.fromEmail,
-            to: [recipientEmail],
-            subject: subject,
-            html: emailHtml
-          })
-        });
-
-        if (response.ok) {
-          isLiveSent = true;
-        }
-      } catch (err) {
-        console.warn('[Resend API] Live dispatch fallback to simulation mode:', err);
-      }
-    }
+    const isLiveSent = await this.sendViaBackend(recipientEmail, subject, emailHtml);
 
     return {
       status: isLiveSent ? 'SENT' : 'SIMULATED',
@@ -426,27 +410,7 @@ export class ResendEmailService {
     const subject = `🌿 Bem-vindo ao Village Azaleia • Cadastro Ativado [Bloco ${unit.block} Apt ${unit.apartment}]`;
     const recipientEmail = unit.residentEmail || 'morador@villageazaleia.com.br';
 
-    let isLiveSent = false;
-    if (this.config.apiKey) {
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.apiKey}`
-          },
-          body: JSON.stringify({
-            from: this.config.fromEmail,
-            to: [recipientEmail],
-            subject: subject,
-            html: emailHtml
-          })
-        });
-        if (response.ok) isLiveSent = true;
-      } catch (err) {
-        console.warn('[Resend API] Welcome dispatch fallback:', err);
-      }
-    }
+    const isLiveSent = await this.sendViaBackend(recipientEmail, subject, emailHtml);
 
     return {
       status: isLiveSent ? 'SENT' : 'SIMULATED',
@@ -467,27 +431,7 @@ export class ResendEmailService {
     const subject = `🧾 Comprovante de Retirada [Protocolo ${protocol}] • Bloco ${pkg.block} Apt ${pkg.apartment}`;
     const recipientEmail = unit.residentEmail || 'morador@villageazaleia.com.br';
 
-    let isLiveSent = false;
-    if (this.config.apiKey) {
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.apiKey}`
-          },
-          body: JSON.stringify({
-            from: this.config.fromEmail,
-            to: [recipientEmail],
-            subject: subject,
-            html: emailHtml
-          })
-        });
-        if (response.ok) isLiveSent = true;
-      } catch (err) {
-        console.warn('[Resend API] Receipt email dispatch fallback:', err);
-      }
-    }
+    const isLiveSent = await this.sendViaBackend(recipientEmail, subject, emailHtml);
 
     return {
       status: isLiveSent ? 'SENT' : 'SIMULATED',
