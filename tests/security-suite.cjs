@@ -233,8 +233,11 @@ async function test(nome, fn) {
       headers: authPortariaHeaders,
       body: JSON.stringify({
         p_package_id: testPkgId,
+        p_qr_token: null,
         p_picked_up_by: 'Jefferson (1a retirada)',
-        p_signature_url: 'data:image/png;base64,assinatura1'
+        p_signature_url: 'data:image/png;base64,assinatura1',
+        p_handover_photo_url: null,
+        p_receipt_protocol: null
       })
     });
     assert(r1.ok, `1a retirada deveria ter sucesso: HTTP ${r1.status} ${await r1.text()}`);
@@ -245,8 +248,11 @@ async function test(nome, fn) {
       headers: authPortariaHeaders,
       body: JSON.stringify({
         p_package_id: testPkgId,
+        p_qr_token: null,
         p_picked_up_by: 'Outra Pessoa (2a retirada)',
-        p_signature_url: 'data:image/png;base64,assinatura2'
+        p_signature_url: 'data:image/png;base64,assinatura2',
+        p_handover_photo_url: null,
+        p_receipt_protocol: null
       })
     });
     const txt2 = await r2.text();
