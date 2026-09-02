@@ -10,7 +10,7 @@ import { ALL_UNITS, INITIAL_PACKAGES, INITIAL_LOGS } from './data/mockData';
 import { generateSeedStaffAccounts } from './data/staffAccounts';
 import * as authService from './services/auth.service';
 import { dbService } from './services/db.service';
-import { AppHeader } from './components/AppHeader';
+import { AppShell } from './components/layout/AppShell';
 import { PortariaView } from './components/PortariaView';
 import { MoradorView } from './components/MoradorView';
 import { TotemView } from './components/TotemView';
@@ -583,58 +583,51 @@ export default function App() {
           )}
         </>
       ) : (
-        <div className="min-h-screen bg-[#F8F9FA] text-[#1A2E22] flex flex-col font-sans antialiased selection:bg-[#D81B60] selection:text-white">
-          {/* 1. Global Push Notification Banner (Visible across ALL tabs & views) */}
+        <AppShell
+          role={session.type}
+          displayName={loggedInDisplayName}
+          pendingCount={session.type === 'portaria' ? pendingCount : undefined}
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={handleLogout}
+        >
+          {/* Global Push Notification Banner (Visible across ALL tabs & views) */}
           <PushNotificationBanner
             notification={activePushPopup}
             onDismiss={() => setActivePushPopup(null)}
             onOpenResidentApp={handleOpenResidentAppFromPush}
           />
 
-          {/* 2. Logged-in Header (identidade da sessão + Sair) */}
-          <AppHeader
-            role={session.type}
-            displayName={loggedInDisplayName}
-            pendingCount={session.type === 'portaria' ? pendingCount : undefined}
-            soundEnabled={soundEnabled}
-            onToggleSound={() => setSoundEnabled(!soundEnabled)}
-            onLogout={handleLogout}
-          />
+          {session.type === 'portaria' && (
+            <PortariaView
+              packages={packages}
+              units={units}
+              operatorName={loggedInDisplayName}
+              onAddPackage={handleAddPackage}
+              onPickupPackage={handlePickupPackage}
+              onShowToast={showToast}
+            />
+          )}
 
-          {/* 3. Main Content Area according to the logged-in role */}
-          <main className="flex-1 pb-16">
-            {session.type === 'portaria' && (
-              <PortariaView
-                packages={packages}
-                units={units}
-                operatorName={loggedInDisplayName}
-                onAddPackage={handleAddPackage}
-                onPickupPackage={handlePickupPackage}
-                onShowToast={showToast}
-              />
-            )}
+          {session.type === 'morador' && (
+            <MoradorView
+              packages={packages}
+              units={units}
+              activeUnitId={session.unitId}
+              onUpdateUnit={handleUpdateUnit}
+              notifications={pushNotifications}
+              onShowToast={showToast}
+            />
+          )}
 
-            {session.type === 'morador' && (
-              <MoradorView
-                packages={packages}
-                units={units}
-                activeUnitId={session.unitId}
-                onUpdateUnit={handleUpdateUnit}
-                notifications={pushNotifications}
-                onShowToast={showToast}
-              />
-            )}
-
-            {session.type === 'sindico' && (
-              <SindicoDashboard
-                packages={packages}
-                logs={logs}
-                units={units}
-                onShowToast={showToast}
-              />
-            )}
-          </main>
-        </div>
+          {session.type === 'sindico' && (
+            <SindicoDashboard
+              packages={packages}
+              units={units}
+              onShowToast={showToast}
+            />
+          )}
+        </AppShell>
       )}
 
       {/* Toast Notification Container */}

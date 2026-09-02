@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PackageItem, ActivityLog, Carrier, Unit, PackageStatus, AuditFilterParams } from '../types';
+import { PackageItem, Carrier, Unit, PackageStatus, AuditFilterParams } from '../types';
 import { CARRIER_CONFIG, SHELF_CONFIG } from '../data/mockData';
 import {
   BarChart3,
@@ -7,45 +7,42 @@ import {
   Package,
   Clock,
   CheckCircle2,
-  AlertCircle,
   Search,
-  Download,
   Filter,
   Layers,
+  Archive,
   Calendar,
-  Building,
-  User,
-  ShieldCheck,
   FileSpreadsheet,
   RotateCcw,
   SlidersHorizontal,
   X,
   Eye,
-  Check,
   ChevronDown,
   ChevronUp,
-  Sparkles,
-  QrCode
+  MessageSquare,
+  FileCheck,
+  Printer
 } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
 import { DeliveryReceiptModal } from './DeliveryReceiptModal';
 import { WhatsAppIntegrationPanel } from './WhatsAppIntegrationPanel';
-import { Printer, FileCheck } from 'lucide-react';
+import { ShelfOccupancyMap } from './ShelfOccupancyMap';
 
 interface SindicoDashboardProps {
   packages: PackageItem[];
-  logs: ActivityLog[];
   units: Unit[];
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
 }
 
+type SindicoTab = 'geral' | 'auditoria' | 'estantes' | 'integracoes';
+
 export const SindicoDashboard: React.FC<SindicoDashboardProps> = ({
   packages,
-  logs,
   units,
   onShowToast
 }) => {
+  const [activeTab, setActiveTab] = useState<SindicoTab>('geral');
   // Advanced Filter state (draft vs applied)
   const defaultFilters: AuditFilterParams = {
     searchTerm: '',
@@ -340,10 +337,49 @@ export const SindicoDashboard: React.FC<SindicoDashboardProps> = ({
         </div>
       </div>
 
-      {/* Integrações — Conexão do WhatsApp real (Evolution API) */}
-      <WhatsAppIntegrationPanel onShowToast={onShowToast} />
+      {/* Navegação por Abas */}
+      <div className="bg-white rounded-2xl p-1.5 border border-[#D4AF37]/40 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs font-bold">
+        {(
+          [
+            { id: 'geral', label: 'Visão Geral', icon: BarChart3 },
+            { id: 'auditoria', label: 'Auditoria', icon: Search },
+            { id: 'estantes', label: 'Estantes', icon: Archive },
+            { id: 'integracoes', label: 'Integrações', icon: MessageSquare }
+          ] as const
+        ).map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setActiveTab(tab.id);
+                sound.playScanBeep();
+              }}
+              className={`py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === tab.id
+                  ? 'bg-gradient-to-r from-[#D81B60] to-[#AD1457] text-white shadow-md font-black'
+                  : 'text-slate-600 hover:text-[#0D3823] hover:bg-slate-50'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      {/* KPI METRIC CARDS */}
+      {/* ABA: INTEGRAÇÕES — Conexão do WhatsApp real (Evolution API) */}
+      {activeTab === 'integracoes' && <WhatsAppIntegrationPanel onShowToast={onShowToast} />}
+
+      {/* ABA: ESTANTES */}
+      {activeTab === 'estantes' && (
+        <ShelfOccupancyMap pendingPackages={pendingPackages} onSelectPackage={(p) => setSelectedPackageDetail(p)} />
+      )}
+
+      {/* ABA: VISÃO GERAL — KPIs + Gráficos */}
+      {activeTab === 'geral' && (
+        <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Encomendas Hoje */}
         <div className="bg-white rounded-2xl border border-[#D4AF37]/35 p-5 shadow-md space-y-2 relative overflow-hidden">
@@ -356,7 +392,8 @@ export const SindicoDashboard: React.FC<SindicoDashboardProps> = ({
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-[#0D3823]">{totalPackages}</span>
             <span className="text-xs text-[#0D3823] font-extrabold flex items-center gap-0.5">
-              <TrendingUp className="w-3.5 h-3.5 text-[#D81B60]" /> 100% ativas
+              <TrendingUp className="w-3.5 h-3.5 text-[#D81B60]" />
+              {totalPackages > 0 ? `${Math.round((pendingPackages.length / totalPackages) * 100)}% pendentes` : '0%'}
             </span>
           </div>
           <p className="text-[11px] text-slate-500 font-medium">Volume total registrado no condomínio</p>
@@ -500,8 +537,11 @@ export const SindicoDashboard: React.FC<SindicoDashboardProps> = ({
           </div>
         </div>
       </div>
+        </>
+      )}
 
-      {/* ADVANCED SEARCH & AUDIT FILTER PANEL */}
+      {/* ABA: AUDITORIA — Busca avançada + tabela */}
+      {activeTab === 'auditoria' && (
       <div className="bg-white rounded-3xl border-2 border-[#D4AF37]/40 shadow-xl overflow-hidden">
         {/* Panel Header */}
         <div className="bg-gradient-to-r from-[#061D12] via-[#0D3823] to-[#15462D] p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -939,6 +979,7 @@ export const SindicoDashboard: React.FC<SindicoDashboardProps> = ({
           </table>
         </div>
       </div>
+      )}
 
       {/* Package Detail Modal */}
       {selectedPackageDetail && (

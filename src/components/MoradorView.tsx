@@ -163,66 +163,11 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
               </button>
             </div>
           </div>
-
-          {/* Quick Metrics Bar on Desktop / Tablet */}
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mt-5 pt-4 border-t border-white/10 text-xs">
-            <div className="p-3.5 rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm">
-              <span className="text-white/70 block text-[11px] font-medium">A Retirar na Portaria</span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-[#FFF2B2]">{availablePackages.length}</span>
-                <span className="text-[10px] text-white/60 font-semibold">encomenda(s)</span>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm">
-              <span className="text-white/70 block text-[11px] font-medium">Histórico Entregue</span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-white">{pickedUpPackages.length}</span>
-                <span className="text-[10px] text-white/60 font-semibold">retirada(s)</span>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-white/10 border border-white/15 backdrop-blur-sm">
-              <span className="text-white/70 block text-[11px] font-medium">WhatsApp Família</span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-emerald-300">
-                  {currentUnit.residentPhones?.length || 1}
-                </span>
-                <span className="text-[10px] text-white/60 font-semibold">de 5 números</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
       {/* Main Container */}
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        {/* Native PWA Prompt Banner if not installed */}
-        {!isInstalledPwa && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0D3823] to-[#15462D] border border-[#D4AF37]/50 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#D81B60] text-white shadow-sm shrink-0">
-                <Download className="w-5 h-5 text-[#FFF2B2]" />
-              </div>
-              <div>
-                <h4 className="text-sm font-black text-white">Instale o App Village Azaleia no Celular</h4>
-                <p className="text-xs text-[#FFF2B2]/90 font-medium">
-                  {isInstallable
-                    ? 'Receba alertas instantâneos na tela do celular e apresente seu QR Code com 1 toque.'
-                    : 'No iPhone/Safari: toque no botão Compartilhar e selecione "Adicionar à Tela de Início".'}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleInstallPWA}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] hover:from-[#C5A059] hover:to-[#B38F48] text-[#061D12] text-xs font-extrabold transition-all shadow-md active:scale-95 whitespace-nowrap self-stretch sm:self-auto"
-            >
-              {isInstallable ? 'Instalar Aplicativo PWA' : 'Como Instalar'}
-            </button>
-          </div>
-        )}
-
         {/* Tab Navigation (Desktop & Tablet pills) */}
         <div className="bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm grid grid-cols-3 gap-1 text-xs font-bold">
           <button
@@ -476,6 +421,32 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
         {/* Tab 3: Meu Cadastro & Telefones */}
         {activeTab === 'perfil' && (
           <div className="space-y-4">
+            {/* Instalar PWA — só aparece pra quem ainda não instalou */}
+            {!isInstalledPwa && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0D3823] to-[#15462D] border border-[#D4AF37]/50 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-[#D81B60] text-white shadow-sm shrink-0">
+                    <Download className="w-5 h-5 text-[#FFF2B2]" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-white">Instale o App Village Azaleia no Celular</h4>
+                    <p className="text-xs text-[#FFF2B2]/90 font-medium">
+                      {isInstallable
+                        ? 'Receba alertas instantâneos na tela do celular e apresente seu QR Code com 1 toque.'
+                        : 'No iPhone/Safari: toque no botão Compartilhar e selecione "Adicionar à Tela de Início".'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleInstallPWA}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] hover:from-[#C5A059] hover:to-[#B38F48] text-[#061D12] text-xs font-extrabold transition-all shadow-md active:scale-95 whitespace-nowrap self-stretch sm:self-auto"
+                >
+                  {isInstallable ? 'Instalar Aplicativo PWA' : 'Como Instalar'}
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-3">

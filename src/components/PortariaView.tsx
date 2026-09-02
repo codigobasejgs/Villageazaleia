@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PackageItem, Unit, ShelfLevel } from '../types';
-import { CARRIER_CONFIG, SHELF_CONFIG } from '../data/mockData';
+import { PackageItem, Unit } from '../types';
 import {
   QrCode,
   CheckCircle2,
@@ -15,6 +14,7 @@ import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
 import { HandoverModal } from './HandoverModal';
 import { DeliveryReceiptModal } from './DeliveryReceiptModal';
 import { PackageIntakeFlow, PackageIntakePayload } from './PackageIntakeFlow';
+import { ShelfOccupancyMap } from './ShelfOccupancyMap';
 
 interface PortariaViewProps {
   packages: PackageItem[];
@@ -208,36 +208,17 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
                 </p>
               </div>
 
-              {/* QR Reader input simulation */}
-              <div className="space-y-3">
-                <div className="relative">
-                  <QrCode className="w-4 h-4 text-[#D81B60] absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={qrSearchCode}
-                    onChange={(e) => handleQrSearch(e.target.value)}
-                    placeholder="Código QR (Ex: QR-B03A102-PKG001) ou Rastreio..."
-                    className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#0D3823] font-mono focus:outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20 shadow-inner"
-                  />
-                </div>
-
-                {/* Quick 1-click test simulation buttons */}
-                <div>
-                  <span className="text-[11px] text-slate-500 font-semibold block mb-1.5">Simulação rápida de QR Code de morador:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {pendingPackages.slice(0, 4).map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleQrSearch(p.qrToken)}
-                        className="px-2.5 py-1 rounded-lg bg-[#F8F9FA] hover:bg-[#FCE4EC] text-[11px] text-[#0D3823] border border-slate-200 hover:border-[#D81B60] flex items-center gap-1.5 transition-colors font-medium"
-                      >
-                        <QrCode className="w-3 h-3 text-[#D81B60]" />
-                        <span>B{p.block} Apt {p.apartment} ({p.residentName.split(' ')[0]})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* QR Code Reader */}
+              <div className="relative">
+                <QrCode className="w-4 h-4 text-[#D81B60] absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  value={qrSearchCode}
+                  onChange={(e) => handleQrSearch(e.target.value)}
+                  placeholder="Código QR (Ex: QR-B03A102-PKG001) ou Rastreio..."
+                  className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#0D3823] font-mono focus:outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20 shadow-inner"
+                  autoFocus
+                />
               </div>
             </div>
 
@@ -270,7 +251,6 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
                   )
                   .map((p) => {
                     const isSelected = selectedPackageForCheckout?.id === p.id;
-                    const cfg = CARRIER_CONFIG[p.carrier];
                     return (
                       <div
                         key={p.id}
@@ -467,95 +447,14 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
 
       {/* TAB 3: MAPA DE ESTANTES */}
       {activeTab === 'estantes' && (
-        <div className="bg-white rounded-2xl border border-[#D4AF37]/35 p-6 shadow-md space-y-6 text-[#1A2E22]">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-            <div>
-              <h3 className="text-lg font-black text-[#0D3823] flex items-center gap-2">
-                <Archive className="w-5 h-5 text-[#D81B60]" />
-                <span>Ocupação das Estantes Físicas da Portaria</span>
-              </h3>
-              <p className="text-xs text-slate-500">
-                Visualização em tempo real das 3 Estantes (A, B, C) e 4 Prateleiras cada
-              </p>
-            </div>
-            <span className="text-xs px-3 py-1 rounded-full bg-[#E8F5E9] text-[#0D3823] border border-[#A5D6A7] font-bold">
-              {pendingPackages.length} itens armazenados no total
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {SHELF_CONFIG.map((shelf) => {
-              const shelfPackages = pendingPackages.filter(p => p.shelf.shelf === shelf.shelf);
-              return (
-                <div key={shelf.shelf} className="bg-[#F8F9FA] rounded-2xl border border-[#D4AF37]/30 p-5 space-y-4 shadow-sm">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <div>
-                      <h4 className="text-base font-black text-[#0D3823]">Estante {shelf.shelf}</h4>
-                      <span className="text-[11px] text-slate-500 font-medium">{shelf.name}</span>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-[#0D3823] text-[#FFF2B2] text-xs font-bold border border-[#D4AF37]/30">
-                      {shelfPackages.length} caixas
-                    </span>
-                  </div>
-
-                  {/* 4 Levels */}
-                  <div className="space-y-3">
-                    {([4, 3, 2, 1] as ShelfLevel[]).map((level) => {
-                      const levelPackages = shelfPackages.filter(p => p.shelf.level === level);
-                      const max = shelf.maxPerLevel;
-                      const pct = Math.min(100, Math.round((levelPackages.length / max) * 100));
-
-                      return (
-                        <div
-                          key={level}
-                          className="p-3 rounded-xl bg-white border border-slate-200 space-y-2 hover:border-[#D4AF37] transition-colors shadow-sm"
-                        >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-bold text-[#0D3823]">Prateleira {level}</span>
-                            <span className="text-slate-500 font-mono text-[11px]">
-                              {levelPackages.length} / {max} ({pct}%)
-                            </span>
-                          </div>
-
-                          {/* Progress bar */}
-                          <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-500 ${
-                                pct > 80 ? 'bg-[#D81B60]' : pct > 50 ? 'bg-[#D4AF37]' : 'bg-[#0D3823]'
-                              }`}
-                              style={{ width: `${Math.max(5, pct)}%` }}
-                            />
-                          </div>
-
-                          {/* Mini parcel chips */}
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {levelPackages.map((p) => (
-                              <button
-                                key={p.id}
-                                onClick={() => {
-                                  setActiveTab('saida');
-                                  setSelectedPackageForCheckout(p);
-                                  setReceiverName(p.residentName);
-                                }}
-                                title={`Bloco ${p.block} Apt ${p.apartment} - ${p.residentName} (${p.carrier})`}
-                                className="px-2 py-0.5 rounded bg-[#FCE4EC] hover:bg-[#D81B60] text-[10px] font-bold text-[#AD1457] hover:text-white border border-[#F48FB1] hover:border-transparent transition-colors truncate max-w-[130px]"
-                              >
-                                B{p.block}-A{p.apartment}
-                              </button>
-                            ))}
-                            {levelPackages.length === 0 && (
-                              <span className="text-[10px] text-slate-400 italic">Vazia / Disponível</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <ShelfOccupancyMap
+          pendingPackages={pendingPackages}
+          onSelectPackage={(p) => {
+            setActiveTab('saida');
+            setSelectedPackageForCheckout(p);
+            setReceiverName(p.residentName);
+          }}
+        />
       )}
 
       {/* HANDOVER MODAL (ASSINATURA DIGITAL + FOTO LGPD) */}

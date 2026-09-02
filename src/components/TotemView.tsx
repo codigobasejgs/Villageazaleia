@@ -26,6 +26,7 @@ interface RegisteredTicket {
   carrier: Carrier;
   trackingCode: string;
   shelf: StorageLocation;
+  hasContact: boolean;
 }
 
 /**
@@ -117,7 +118,8 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
       residentName,
       carrier,
       trackingCode: tracking,
-      shelf
+      shelf,
+      hasContact: !!matchedUnit
     });
     sound.playCheckout();
   };
@@ -185,7 +187,9 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
             <span className="font-brand font-bold text-xs tracking-wider text-[#D81B60] uppercase">Depósito Finalizado</span>
             <h3 className="text-2xl font-black text-[#0D3823]">Depósito Realizado com Sucesso!</h3>
             <p className="text-xs text-slate-500 mt-1 font-medium">
-              O morador já foi notificado automaticamente via WhatsApp, E-mail e Push.
+              {ticket.hasContact
+                ? 'O morador já foi notificado automaticamente via WhatsApp e E-mail.'
+                : 'Morador sem cadastro de WhatsApp/e-mail — a Portaria fará a entrega manualmente.'}
             </p>
           </div>
 
