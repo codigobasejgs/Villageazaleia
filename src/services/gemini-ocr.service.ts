@@ -1,5 +1,6 @@
 import { Carrier } from '../types';
 import { ExtractedLabelData } from './ocr-parser.service';
+import { supabase } from '../lib/supabase';
 
 interface GeminiLabelResponse {
   carrier: Carrier;
@@ -20,9 +21,15 @@ interface GeminiLabelResponse {
 export const geminiOcrService = {
   async analyzeLabelPhoto(imageDataUrl: string): Promise<ExtractedLabelData | null> {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || '';
+
       const response = await fetch('/api/ocr/analyze-label', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ imageBase64: imageDataUrl })
       });
 

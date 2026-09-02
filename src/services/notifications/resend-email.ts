@@ -1,4 +1,5 @@
 import { PackageItem, Unit, EmailDispatchStatus } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 const SEND_TIMEOUT_MS = 20000;
 
@@ -7,20 +8,26 @@ export class ResendEmailService {
    * Envia via o backend (/api/email/send) — a apikey da Resend nunca fica no navegador.
    * Mesmo padrão de segurança usado pro WhatsApp (evolution-whatsapp.ts).
    */
-  private async sendViaBackend(to: string, subject: string, html: string): Promise<boolean> {
+  private async sendViaBackend(to: string, subject: string, html: string): Promise<'SENT' | 'FAILED'> {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || '';
+
       const response = await fetch('/api/email/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ to, subject, html }),
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS)
       });
-      if (!response.ok) return false;
+      if (!response.ok) return 'FAILED';
       const data = await response.json();
-      return data.status === 'SENT';
+      return data.status === 'SENT' ? 'SENT' : 'FAILED';
     } catch (err) {
       console.warn('[Resend] Falha ao chamar /api/email/send:', err);
-      return false;
+      return 'FAILED';
     }
   }
 
@@ -33,7 +40,7 @@ export class ResendEmailService {
       minute: '2-digit'
     });
     const formattedDate = new Date(pkg.receivedAt).toLocaleDateString('pt-BR');
-    const pwaAppUrl = typeof window !== 'undefined' ? `${window.location.origin}?unit=${pkg.unitId}&role=morador` : 'https://village-azaleia.app';
+    const pwaAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://villageazaleia.vercel.app';
 
     return `
 <!DOCTYPE html>
@@ -176,12 +183,23 @@ export class ResendEmailService {
   public async sendParcelNotification(pkg: PackageItem, unit: Unit): Promise<EmailDispatchStatus> {
     const emailHtml = this.generateEmailHtml(pkg, unit);
     const subject = `📦 Sua encomenda ${pkg.carrier} chegou! [Bloco ${pkg.block} Apt ${pkg.apartment}]`;
-    const recipientEmail = unit.residentEmail || 'morador@villageazaleia.com.br';
+    const recipientEmail = unit.residentEmail?.trim();
 
-    const isLiveSent = await this.sendViaBackend(recipientEmail, subject, emailHtml);
+    if (!recipientEmail || !recipientEmail.includes('@') || recipientEmail.startsWith('morador@villageazaleia')) {
+      return {
+        status: 'FAILED',
+        recipientEmail: recipientEmail || '(sem e-mail)',
+        recipientName: unit.residentName,
+        subject,
+        deliveredAt: new Date().toISOString(),
+        htmlPreview: emailHtml
+      };
+    }
+
+    const res = await this.sendViaBackend(recipientEmail, subject, emailHtml);
 
     return {
-      status: isLiveSent ? 'SENT' : 'SIMULATED',
+      status: res,
       recipientEmail,
       recipientName: unit.residentName,
       subject,
@@ -194,7 +212,7 @@ export class ResendEmailService {
    * Generates branded Welcome HTML Email with LGPD terms summary
    */
   public generateWelcomeEmailHtml(unit: Unit): string {
-    const pwaAppUrl = typeof window !== 'undefined' ? `${window.location.origin}?unit=${unit.id}&role=morador` : 'https://village-azaleia.app';
+    const pwaAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://villageazaleia.vercel.app';
     const regDate = new Date().toLocaleDateString('pt-BR');
 
     return `
@@ -287,7 +305,7 @@ export class ResendEmailService {
     const pickupDate = pkg.pickedUpAt ? new Date(pkg.pickedUpAt) : new Date();
     const formattedTime = pickupDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const formattedDate = pickupDate.toLocaleDateString('pt-BR');
-    const pwaAppUrl = typeof window !== 'undefined' ? `${window.location.origin}?unit=${unit.id}&role=morador` : 'https://village-azaleia.app';
+    const pwaAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://villageazaleia.vercel.app';
 
     return `
 <!DOCTYPE html>
@@ -408,12 +426,23 @@ export class ResendEmailService {
   public async sendWelcomeEmail(unit: Unit): Promise<EmailDispatchStatus> {
     const emailHtml = this.generateWelcomeEmailHtml(unit);
     const subject = `🌿 Bem-vindo ao Village Azaleia • Cadastro Ativado [Bloco ${unit.block} Apt ${unit.apartment}]`;
-    const recipientEmail = unit.residentEmail || 'morador@villageazaleia.com.br';
+    const recipientEmail = unit.residentEmail?.trim();
 
-    const isLiveSent = await this.sendViaBackend(recipientEmail, subject, emailHtml);
+    if (!recipientEmail || !recipientEmail.includes('@') || recipientEmail.startsWith('morador@villageazaleia')) {
+      return {
+        status: 'FAILED',
+        recipientEmail: recipientEmail || '(sem e-mail)',
+        recipientName: unit.residentName,
+        subject,
+        deliveredAt: new Date().toISOString(),
+        htmlPreview: emailHtml
+      };
+    }
+
+    const res = await this.sendViaBackend(recipientEmail, subject, emailHtml);
 
     return {
-      status: isLiveSent ? 'SENT' : 'SIMULATED',
+      status: res,
       recipientEmail,
       recipientName: unit.residentName,
       subject,
@@ -429,12 +458,23 @@ export class ResendEmailService {
     const emailHtml = this.generateDeliveryReceiptHtml(pkg, unit);
     const protocol = pkg.receiptProtocol || `REC-VA-${pkg.id.replace(/\D/g, '').slice(-8) || '20260829'}`;
     const subject = `🧾 Comprovante de Retirada [Protocolo ${protocol}] • Bloco ${pkg.block} Apt ${pkg.apartment}`;
-    const recipientEmail = unit.residentEmail || 'morador@villageazaleia.com.br';
+    const recipientEmail = unit.residentEmail?.trim();
 
-    const isLiveSent = await this.sendViaBackend(recipientEmail, subject, emailHtml);
+    if (!recipientEmail || !recipientEmail.includes('@') || recipientEmail.startsWith('morador@villageazaleia')) {
+      return {
+        status: 'FAILED',
+        recipientEmail: recipientEmail || '(sem e-mail)',
+        recipientName: unit.residentName,
+        subject,
+        deliveredAt: new Date().toISOString(),
+        htmlPreview: emailHtml
+      };
+    }
+
+    const res = await this.sendViaBackend(recipientEmail, subject, emailHtml);
 
     return {
-      status: isLiveSent ? 'SENT' : 'SIMULATED',
+      status: res,
       recipientEmail,
       recipientName: unit.residentName,
       subject,

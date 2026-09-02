@@ -1,0 +1,911 @@
+<title>Auditoria Village Azaleia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    --ground:      #F5F7F4;
+    --surface:     #FFFFFF;
+    --surface-alt: #ECF0EC;
+    --ink:         #131D17;
+    --ink-soft:    #4C5B52;
+    --ink-faint:   #78877E;
+    --rule:        #D2DAD3;
+    --rule-hard:   #0F2B1C;
+    --brand:       #0D3823;
+
+    --crit:        #A81E14;
+    --crit-bg:     #FBE9E7;
+    --high:        #9A5400;
+    --high-bg:     #FBF0DF;
+    --med:         #2F5480;
+    --med-bg:      #E7EEF7;
+    --low:         #5B6A61;
+    --low-bg:      #EAEEEA;
+    --ok:          #1B5E33;
+    --ok-bg:       #E3F0E6;
+
+    --measure: 68ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0E1512;
+      --surface:     #151F19;
+      --surface-alt: #1B2721;
+      --ink:         #E7EDE8;
+      --ink-soft:    #A9B7AD;
+      --ink-faint:   #7C8B81;
+      --rule:        #2A3830;
+      --rule-hard:   #C7D3C9;
+      --brand:       #8FC7A4;
+
+      --crit:        #FF9A8E;
+      --crit-bg:     #2E1512;
+      --high:        #E8B461;
+      --high-bg:     #2C2113;
+      --med:         #9BBEE4;
+      --med-bg:      #16232F;
+      --low:         #9CAAA1;
+      --low-bg:      #1D2620;
+      --ok:          #86D69C;
+      --ok-bg:       #14271A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0E1512;
+    --surface:     #151F19;
+    --surface-alt: #1B2721;
+    --ink:         #E7EDE8;
+    --ink-soft:    #A9B7AD;
+    --ink-faint:   #7C8B81;
+    --rule:        #2A3830;
+    --rule-hard:   #C7D3C9;
+    --brand:       #8FC7A4;
+
+    --crit:        #FF9A8E;
+    --crit-bg:     #2E1512;
+    --high:        #E8B461;
+    --high-bg:     #2C2113;
+    --med:         #9BBEE4;
+    --med-bg:      #16232F;
+    --low:         #9CAAA1;
+    --low-bg:      #1D2620;
+    --ok:          #86D69C;
+    --ok-bg:       #14271A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 28px 120px;
+  }
+
+  h1, h2, h3, h4, .ui {
+    font-family: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  code, .mono {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, monospace;
+    font-size: 0.86em;
+    font-variant-ligatures: none;
+  }
+
+  code {
+    background: var(--surface-alt);
+    padding: 1px 5px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 3px solid var(--rule-hard);
+    padding: 56px 0 22px;
+    margin-bottom: 40px;
+  }
+
+  .stamp {
+    display: inline-block;
+    font-family: "Archivo", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--crit);
+    border: 2px solid var(--crit);
+    background: var(--crit-bg);
+    padding: 5px 12px;
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    font-size: clamp(34px, 6vw, 56px);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.022em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+
+  .dek {
+    font-size: 19px;
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0 0 30px;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    gap: 20px 28px;
+    border-top: 1px solid var(--rule);
+    padding-top: 20px;
+  }
+
+  .meta-grid dt {
+    font-family: "Archivo", sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 5px;
+  }
+
+  .meta-grid dd {
+    margin: 0;
+    font-family: "Archivo", sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- scoreboard ---------- */
+
+  .score {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: 2px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 0 0 52px;
+  }
+
+  .score div {
+    background: var(--surface);
+    padding: 18px 16px;
+  }
+
+  .score .n {
+    font-family: "Archivo", sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    display: block;
+  }
+
+  .score .l {
+    font-family: "Archivo", sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-top: 8px;
+    display: block;
+  }
+
+  .score .c-crit { color: var(--crit); }
+  .score .c-high { color: var(--high); }
+  .score .c-med  { color: var(--med); }
+  .score .c-low  { color: var(--low); }
+
+  /* ---------- sections ---------- */
+
+  section { margin-bottom: 60px; }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 0 0 20px;
+    padding-bottom: 9px;
+    border-bottom: 2px solid var(--rule-hard);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  h2 .num {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ink-faint);
+    letter-spacing: 0;
+  }
+
+  h3 {
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 34px 0 12px;
+  }
+
+  p { max-width: var(--measure); margin: 0 0 15px; }
+
+  ul { max-width: var(--measure); margin: 0 0 15px; padding-left: 20px; }
+  li { margin-bottom: 7px; }
+
+  strong { font-weight: 600; }
+
+  .lead {
+    font-size: 19px;
+    border-left: 3px solid var(--brand);
+    padding-left: 20px;
+    margin-bottom: 26px;
+  }
+
+  /* ---------- findings ---------- */
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--sev, var(--rule-hard));
+    padding: 20px 22px;
+    margin-bottom: 16px;
+  }
+
+  .finding.crit { --sev: var(--crit); }
+  .finding.high { --sev: var(--high); }
+  .finding.med  { --sev: var(--med); }
+
+  .fhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .fid {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-faint);
+  }
+
+  .pill {
+    font-family: "Archivo", sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+  }
+
+  .p-crit { background: var(--crit); color: var(--ground); }
+  .p-high { background: var(--high); color: var(--ground); }
+  .p-med  { background: var(--med);  color: var(--ground); }
+  .p-low  { background: var(--low);  color: var(--ground); }
+  .p-flow {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+  }
+
+  .ftitle {
+    font-family: "Archivo", sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.3;
+    width: 100%;
+    margin: 0;
+  }
+
+  .finding p { margin: 0 0 10px; max-width: none; }
+  .finding p:last-child { margin-bottom: 0; }
+
+  .flabel {
+    font-family: "Archivo", sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .evidence {
+    background: var(--surface-alt);
+    border-left: 2px solid var(--rule-hard);
+    padding: 12px 14px;
+    margin: 12px 0;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.62;
+    white-space: pre-wrap;
+    overflow-x: auto;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tscroll { overflow-x: auto; margin-bottom: 22px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Archivo", sans-serif;
+    font-size: 14px;
+    background: var(--surface);
+  }
+
+  th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--rule-hard);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    font-variant-numeric: tabular-nums;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  .v { font-weight: 700; white-space: nowrap; }
+  .v-fail { color: var(--crit); }
+  .v-part { color: var(--high); }
+  .v-pass { color: var(--ok); }
+
+  /* ---------- checklist ---------- */
+
+  .check {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 6px 0;
+  }
+
+  .check div {
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    gap: 12px;
+    align-items: baseline;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--rule);
+    font-family: "Archivo", sans-serif;
+    font-size: 14.5px;
+  }
+
+  .check div:last-child { border-bottom: none; }
+
+  .box {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 600;
+    color: var(--crit);
+  }
+
+  .box.done { color: var(--ok); }
+
+  .cref {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
+  .note {
+    background: var(--surface-alt);
+    border: 1px solid var(--rule);
+    padding: 16px 18px;
+    font-size: 15.5px;
+    margin: 22px 0;
+  }
+
+  .note p:last-child { margin-bottom: 0; }
+
+  footer {
+    border-top: 2px solid var(--rule-hard);
+    padding-top: 20px;
+    margin-top: 70px;
+    font-family: "Archivo", sans-serif;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+
+  a { color: var(--brand); }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <span class="stamp">Reprovado para go-live</span>
+    <h1>Auditoria Village Azaleia</h1>
+    <p class="dek">Auditoria técnica completa do Sistema Inteligente de Gestão de Encomendas — segurança, integridade de dados, fluxos operacionais e relatórios. Nenhuma linha de código foi alterada durante o diagnóstico.</p>
+    <dl class="meta-grid">
+      <div><dt>Alvo</dt><dd>villageazaleia.vercel.app</dd></div>
+      <div><dt>Data</dt><dd>02/09/2026</dd></div>
+      <div><dt>Escopo</dt><dd>11.526 LOC · 53 arquivos</dd></div>
+      <div><dt>Método</dt><dd>Estático + sonda ativa</dd></div>
+      <div><dt>Veredito</dt><dd style="color:var(--crit)">Não operacional</dd></div>
+    </dl>
+  </header>
+
+  <div class="score">
+    <div><span class="n c-crit">7</span><span class="l">Críticos</span></div>
+    <div><span class="n c-high">11</span><span class="l">Altos</span></div>
+    <div><span class="n c-med">14</span><span class="l">Médios</span></div>
+    <div><span class="n c-low">6</span><span class="l">Baixos</span></div>
+    <div><span class="n">0/6</span><span class="l">Fluxos aprovados</span></div>
+    <div><span class="n">3/17</span><span class="l">Critérios de aceite</span></div>
+  </div>
+
+  <section>
+    <h2><span class="num">01</span> Resumo executivo</h2>
+
+    <p class="lead">O sistema funciona como demonstração e falha como sistema de custódia. A interface está bem construída e o fluxo operacional é coerente — mas <strong>não existe controle de acesso em nenhuma camada</strong>, e as garantias que o sistema exibe na tela (notificação enviada, encomenda registrada, assinatura coletada) não correspondem, em vários caminhos, ao que de fato aconteceu.</p>
+
+    <p>Três conclusões independentes sustentam a reprovação:</p>
+
+    <p><strong>1. O banco está aberto à internet.</strong> Todas as seis tabelas têm política <code>FOR ALL USING (true)</code> e a chave anônima está — corretamente, por design do Vite — dentro do bundle público. Isso significa que qualquer pessoa com o endereço do site lê, altera e apaga qualquer registro. Confirmei isso executando as operações, não deduzindo: apaguei uma linha de auditoria que eu mesmo criei, e li os hashes de senha das contas de portaria e síndico.</p>
+
+    <p><strong>2. A autenticação é decorativa.</strong> Abrir <code>villageazaleia.vercel.app/?role=sindico</code> entrega o painel administrativo completo, sem senha. O mesmo parâmetro entra como qualquer morador escolhido — e esse link, com <code>?role=morador</code>, é enviado dentro de toda mensagem de WhatsApp e e-mail que o sistema dispara.</p>
+
+    <p><strong>3. O sistema afirma fatos que não verifica.</strong> O toast de sucesso do registro é disparado antes das requisições terminarem. O log permanente de auditoria grava <em>"Disparo Multicanal: 2 WhatsApp(s), E-mail Resend e Web Push"</em> contando tentativas, não entregas. Uma falha real de e-mail é registrada como <code>SIMULATED</code> — a mesma palavra usada para teste local. Numa disputa sobre encomenda extraviada, o síndico leria essa trilha como prova de que o morador foi avisado.</p>
+
+    <div class="note">
+      <p><strong>Circunstância atenuante relevante:</strong> a base de produção está praticamente vazia hoje — 1 unidade cadastrada, 2 contas de staff, 0 encomendas. A exposição real de dados pessoais neste momento é mínima. A janela para corrigir antes da operação começar está aberta, e é isso que torna esta auditoria útil em vez de tardia.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span> Arquitetura encontrada</h2>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Camada</th><th>Tecnologia</th><th>Observação de auditoria</th></tr></thead>
+        <tbody>
+          <tr><td>Frontend</td><td>React 19 + Vite 6 + TypeScript + Tailwind v4</td><td>PWA com <code>vite-plugin-pwa</code>, service worker só de cache</td></tr>
+          <tr><td>Backend</td><td>5 funções serverless Vercel em <code>api/</code></td><td>Apenas proxies de integração — nenhuma lógica de negócio</td></tr>
+          <tr><td>Banco</td><td>Supabase PostgreSQL, 6 tabelas</td><td>Acessado <strong>direto do navegador</strong> com chave anônima</td></tr>
+          <tr><td>Storage</td><td>Bucket <code>village-azaleia-storage</code></td><td>Público; guarda assinaturas e fotos de entrega</td></tr>
+          <tr><td>Autenticação</td><td>Própria, SHA-256 no navegador</td><td>Supabase Auth não é usado; nenhuma verificação server-side</td></tr>
+          <tr><td>Integrações</td><td>Evolution API, Resend, Gemini Vision</td><td>Chaves corretamente server-only — este ponto está certo</td></tr>
+          <tr><td>Papéis</td><td>morador · portaria · totem · síndico</td><td>Imposição apenas por renderização condicional em React</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>Achado arquitetural de raiz:</strong> não existe camada de servidor entre o navegador e o banco. O React fala Postgres direto. Toda regra de negócio — quem pode ver o quê, quem pode dar baixa, o que é um estado válido — mora em código que roda na máquina do usuário e que ele pode modificar. Nenhuma correção pontual de tela resolve isso: a superfície de ataque não passa pela sua interface.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span> Matriz de conformidade</h2>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Fluxo</th><th>Implementado</th><th>Testado</th><th>Resultado</th><th>Bloqueio principal</th></tr></thead>
+        <tbody>
+          <tr><td><strong>1. Entrega pelo entregador</strong></td><td>Sim</td><td>Estático</td><td class="v v-part">⚠ PARCIAL</td><td>Sem unicidade de rastreio; código sintético quando vazio</td></tr>
+          <tr><td><strong>2. Recebimento na portaria</strong></td><td>Sim</td><td>Estático</td><td class="v v-fail">✕ FALHA</td><td>Operador é texto livre editável, sem vínculo com conta</td></tr>
+          <tr><td><strong>3. Armazenamento</strong></td><td>Parcial</td><td>Estático</td><td class="v v-fail">✕ FALHA</td><td>Estante não tem caminho de escrita nem histórico</td></tr>
+          <tr><td><strong>4. Aviso ao morador</strong></td><td>Sim</td><td>Estático</td><td class="v v-fail">✕ FALHA</td><td>Falha de envio registrada como sucesso</td></tr>
+          <tr><td><strong>5. Retirada pelo morador</strong></td><td>Sim</td><td>Estático</td><td class="v v-fail">✕ FALHA</td><td>Sem checagem de estado; QR previsível e dispensável</td></tr>
+          <tr><td><strong>6. Relatórios e controle</strong></td><td>Sim</td><td>Estático</td><td class="v v-fail">✕ FALHA</td><td>Mock exibido como real; gráfico por bloco perde dados</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Requisito transversal</th><th>Resultado</th><th>Evidência</th></tr></thead>
+        <tbody>
+          <tr><td>Autenticação e RBAC</td><td class="v v-fail">✕ FALHA</td><td><code>App.tsx:189-208</code> — sessão por URL</td></tr>
+          <tr><td>Proteção de APIs</td><td class="v v-fail">✕ FALHA</td><td>5 endpoints sem auth e sem rate limit</td></tr>
+          <tr><td>Isolamento entre moradores</td><td class="v v-fail">✕ FALHA</td><td>Filtro no cliente sobre array global</td></tr>
+          <tr><td>Auditoria e rastreabilidade</td><td class="v v-fail">✕ FALHA</td><td>Trilha apagável; nunca exibida em tela alguma</td></tr>
+          <tr><td>Integridade transacional</td><td class="v v-fail">✕ FALHA</td><td><code>UPDATE</code> incondicional em <code>db.service.ts:244</code></td></tr>
+          <tr><td>Volume operacional (80/dia)</td><td class="v v-part">⚠ PARCIAL</td><td>Sem paginação nem virtualização</td></tr>
+          <tr><td>Tratamento de erro</td><td class="v v-fail">✕ FALHA</td><td>Erros engolidos em <code>console.warn</code></td></tr>
+          <tr><td>Operação em tablet</td><td class="v v-part">⚠ PARCIAL</td><td>Botão de confirmar retirada com alvo ~36px</td></tr>
+          <tr><td>Segredos de integração</td><td class="v v-pass">✓ PASSA</td><td>Server-only, fora do bundle — correto</td></tr>
+          <tr><td>Realtime multi-dispositivo</td><td class="v v-pass">✓ PASSA</td><td>Encanamento correto, sem tratamento de falha</td></tr>
+          <tr><td>Consentimento LGPD (coleta)</td><td class="v v-part">⚠ PARCIAL</td><td>Coletado, mas <code>DEFAULT TRUE</code> fabrica no banco</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span> Bugs críticos</h2>
+
+    <div class="finding crit">
+      <div class="fhead">
+        <span class="fid">BUG-001</span>
+        <span class="pill p-crit">Crítico</span>
+        <span class="pill p-flow">Segurança · Banco</span>
+        <h3 class="ftitle">Banco inteiro legível, editável e apagável por qualquer pessoa</h3>
+      </div>
+      <p><span class="flabel">Problema</span>As seis tabelas têm política <code>FOR ALL USING (true) WITH CHECK (true)</code> (<code>schema.sql:146-162</code>). A chave anônima está no bundle público — o que é correto <em>desde que</em> o RLS restrinja. Como não restringe, essa chave equivale a credencial de leitura e escrita irrestrita.</p>
+      <p><span class="flabel">Causa</span>Políticas de desenvolvimento levadas para produção sem substituição por regras ancoradas em identidade.</p>
+      <p><span class="flabel">Evidência — sonda executada contra produção</span></p>
+      <div class="evidence">1) INSERT anonimo em activity_logs      -> HTTP 201
+2) UPDATE anonimo (adulterar trilha)    -> HTTP 204
+3) DELETE anonimo (apagar trilha)       -> HTTP 204
+4) Limpeza confirmada (linha removida)  -> SIM
+5) SELECT anonimo staff_accounts        -> HTTP 200 | contas expostas: 2 | hash legivel: SIM
+6) SELECT anonimo units (dados pessoais)-> HTTP 200 | moradores expostos: 1</div>
+      <p>A linha usada no teste foi criada e removida por mim; nenhum dado preexistente foi tocado. O passo 5 é o mais grave: com o hash de síndico em mãos e o algoritmo público (<code>auth.service.ts:12</code>, SHA-256 com salt global fixo), a senha cai em segundos — ou o atacante simplesmente grava um hash próprio via <code>UPDATE</code> e passa a logar legitimamente.</p>
+      <p><span class="flabel">Correção</span>Substituir as políticas por regras baseadas em <code>auth.uid()</code>; <code>staff_accounts</code> não deve ser legível por <code>anon</code> em hipótese alguma; migrar autenticação para Supabase Auth. Rotacionar as senhas de staff depois.</p>
+      <p><span class="flabel">Resultado</span><strong style="color:var(--crit)">FAIL</strong> — confirmado empiricamente.</p>
+    </div>
+
+    <div class="finding crit">
+      <div class="fhead">
+        <span class="fid">BUG-002</span>
+        <span class="pill p-crit">Crítico</span>
+        <span class="pill p-flow">Autenticação</span>
+        <h3 class="ftitle">Parâmetro de URL concede sessão de síndico sem senha</h3>
+      </div>
+      <p><span class="flabel">Problema</span><code>App.tsx:189-208</code> lê <code>?role=</code> e cria a sessão sem qualquer credencial. <code>?role=sindico</code> abre o painel administrativo; <code>?role=morador&amp;unit=B05-A304</code> entra como aquele morador específico.</p>
+      <p><span class="flabel">Agravante</span>Esse link é embutido em toda mensagem enviada — <code>evolution-whatsapp.ts:21</code> e <code>resend-email.ts:36</code> montam <code>${origin}?unit=${pkg.unitId}&amp;role=morador</code>. Basta trocar o valor de <code>unit</code> para ver as encomendas, fotos e QR Codes de outro apartamento.</p>
+      <p><span class="flabel">Agravante 2</span>O efeito depende de <code>[units, staffAccounts]</code>, então re-executa a cada sincronização — o logout não segura enquanto o parâmetro estiver na URL.</p>
+      <p><span class="flabel">Correção</span>Remover o bloco. Era atalho de desenvolvimento que foi para produção; o custo de remoção é de poucas linhas.</p>
+      <p><span class="flabel">Resultado</span><strong style="color:var(--crit)">FAIL</strong> — análise estática (o alvo Vercel está inacessível desta rede; ver §9).</p>
+    </div>
+
+    <div class="finding crit">
+      <div class="fhead">
+        <span class="fid">BUG-003</span>
+        <span class="pill p-crit">Crítico</span>
+        <span class="pill p-flow">Fluxo 5 · Retirada</span>
+        <h3 class="ftitle">Retirada sem verificação de estado — dupla baixa destrói a assinatura anterior</h3>
+      </div>
+      <p><span class="flabel">Problema</span><code>App.tsx:396</code> tem uma única precondição: <code>if (!targetPkg) return;</code>. Verifica existência, não estado. Não há <code>if (targetPkg.status === 'RETIRADA') return;</code>. A escrita em <code>db.service.ts:244</code> é <code>UPDATE ... WHERE id = ?</code>, sem compare-and-swap.</p>
+      <p><span class="flabel">Cenário reproduzível</span>Porteiro A e Porteiro B, tablets distintos, mesmo pacote visível. A coleta a assinatura da mãe e confirma. B, com o modal já aberto, coleta a assinatura do filho e confirma. O segundo <code>UPDATE</code> sobrescreve <code>picked_up_by</code>, <code>signature_url</code>, <code>picked_up_at</code> e <code>receipt_protocol</code>. <strong>A assinatura de A é destruída.</strong> Ficam dois pares de log com destinatários diferentes e uma linha em <code>packages</code> que afirma só o segundo.</p>
+      <p><span class="flabel">Por que a proteção existente não basta</span><code>HandoverModal.tsx:316</code> bloqueia duplo clique local e o filtro de <code>PortariaView.tsx:61-63</code> some com o item da lista — mas nada disso atravessa dispositivos, e o modal não reage a mudanças no array de pacotes.</p>
+      <p><span class="flabel">Correção</span><code>UPDATE ... WHERE id = ? AND status = 'ARMAZENADA'</code> com <code>.select()</code>, tratando retorno vazio como "já retirado por outro operador".</p>
+      <p><span class="flabel">Resultado</span><strong style="color:var(--crit)">FAIL</strong></p>
+    </div>
+
+    <div class="finding crit">
+      <div class="fhead">
+        <span class="fid">BUG-004</span>
+        <span class="pill p-crit">Crítico</span>
+        <span class="pill p-flow">Integridade · UX</span>
+        <h3 class="ftitle">Falhas de banco e de envio são invisíveis — o sistema afirma sucesso</h3>
+      </div>
+      <p><span class="flabel">Problema</span>Toda a camada de dados engole erro: <code>db.service.ts</code> faz <code>console.warn</code> e retorna <code>null</code>/<code>false</code> em <code>fetchUnits</code>, <code>insertPackage</code>, <code>updatePackage</code> e <code>insertLog</code>. Do outro lado, <code>App.tsx:330</code> chama <code>insertPackage</code> <strong>sem <code>await</code> e sem verificar o retorno</strong>. O update otimista mantém o item na tela.</p>
+      <p><span class="flabel">Consequência 1</span>Supabase fora do ar é indistinguível de operação normal. O porteiro registra encomendas a tarde inteira vendo toast verde, e nada persistiu.</p>
+      <p><span class="flabel">Consequência 2</span>Quando o fetch falha, <code>App.tsx:154-157</code> mantém o estado anterior — que são <strong>7 encomendas fictícias de <code>mockData.ts</code></strong>, com fotos de banco de imagens. Elas contam nos KPIs e saem no CSV como dados reais.</p>
+      <p><span class="flabel">Consequência 3</span><code>PackageIntakeFlow.tsx:279-282</code> dispara toast afirmando "WhatsApp, E-mail e Push disparados" enquanto as requisições ainda estão em voo.</p>
+      <p><span class="flabel">Correção</span><code>await</code> nas escritas, verificação do retorno, toast condicionado ao resultado real, e banner de "sem conexão com o servidor" quando o fetch falha.</p>
+      <p><span class="flabel">Resultado</span><strong style="color:var(--crit)">FAIL</strong></p>
+    </div>
+
+    <div class="finding crit">
+      <div class="fhead">
+        <span class="fid">BUG-005</span>
+        <span class="pill p-crit">Crítico</span>
+        <span class="pill p-flow">Fluxo 5 · Retirada</span>
+        <h3 class="ftitle">QR Code é previsível, não expira, não é consumido — e é dispensável</h3>
+      </div>
+      <p><span class="flabel">Problema</span><code>App.tsx:301</code> gera o token como <code>QR-B03A102-148800</code>: bloco (público), apartamento (público) e os <strong>6 últimos dígitos de <code>Date.now()</code></strong>. Zero entropia criptográfica — nenhuma chamada a <code>crypto.getRandomValues</code>. Os 6 dígitos cobrem ~16 minutos e são monotônicos; quem sabe aproximadamente quando o pacote chegou (o próprio WhatsApp informa o horário) reduz o espaço a alguns milhares de valores.</p>
+      <p><span class="flabel">Problema maior</span>Nem é preciso adivinhar. <code>PortariaView.tsx:110-123</code> aceita <code>trackingCode</code> ou <code>id</code> como alternativa ao QR — e o código de rastreio está <strong>impresso na etiqueta colada na caixa</strong>. Todo o mecanismo de token é contornado digitando um dado visível a qualquer um que passe pela portaria.</p>
+      <p><span class="flabel">Problema 3</span>Encontrado o pacote, o nome do recebedor já vem preenchido com o titular (<code>PortariaView.tsx:120</code>) e é editável livre. A validação exige apenas que o campo não esteja vazio — e ele nunca está. Não há documento, código de confirmação ou qualquer verificação de identidade.</p>
+      <p><span class="flabel">Problema 4</span>Sem <code>expires_at</code>, sem coluna de consumo, sem <code>UNIQUE</code> em <code>qr_token</code>. O badge "QR Code Validado" (<code>PortariaView.tsx:379</code>) aparece mesmo quando o pacote foi selecionado por clique na lista, sem QR nenhum.</p>
+      <p><span class="flabel">Correção</span>Token com <code>crypto.randomUUID()</code>, <code>UNIQUE</code>, expiração, marcação de consumo e validação server-side. Remover <code>trackingCode</code> e <code>id</code> como chaves de retirada.</p>
+      <p><span class="flabel">Resultado</span><strong style="color:var(--crit)">FAIL</strong></p>
+    </div>
+
+    <div class="finding crit">
+      <div class="fhead">
+        <span class="fid">BUG-006</span>
+        <span class="pill p-crit">Crítico</span>
+        <span class="pill p-flow">API</span>
+        <h3 class="ftitle">Endpoints abertos: gateway de WhatsApp e de e-mail para qualquer pessoa</h3>
+      </div>
+      <p><span class="flabel">Problema</span>Nenhum dos 5 endpoints tem autenticação, verificação de origem ou rate limit.</p>
+      <p><span class="flabel">Impacto — WhatsApp</span><code>api/whatsapp/send.ts:36-42</code> aceita <code>phone</code> e <code>text</code> arbitrários e repassa à Evolution API assinando com a instância oficial do condomínio. É um gateway aberto: golpe do falso boleto e phishing saindo <strong>do número verificado do condomínio</strong>, com risco de banimento do número.</p>
+      <p><span class="flabel">Impacto — e-mail</span><code>api/email/send.ts:31-43</code> aceita <code>to</code>, <code>subject</code> e <code>html</code> totalmente controlados, com <code>from</code> fixo no domínio do condomínio — SPF e DKIM válidos. Phishing entregue na caixa de entrada com todos os selos de autenticidade, e a reputação do domínio queimada no Resend.</p>
+      <p><span class="flabel">Impacto — Gemini</span><code>api/ocr/analyze-label.ts</code> vira serviço de OCR gratuito às custas da cota paga do projeto. Sem limite de tamanho além do limite do Vercel.</p>
+      <p><span class="flabel">Impacto — Evolution</span><code>connect.ts</code> permite forçar reconexão da instância repetidamente (derruba a sessão de WhatsApp do condomínio) e retorna <code>debugRawResponse</code> com o payload cru da API interna.</p>
+      <p><span class="flabel">Nota sobre CORS</span>Ausência de cabeçalhos CORS limita chamadas por JavaScript de outra origem no navegador, mas não protege nada: <code>curl</code> e qualquer script server-side ignoram CORS.</p>
+      <p><span class="flabel">Correção</span>Exigir JWT do Supabase, validar o papel do chamador, adicionar rate limit por IP, e restringir <code>to</code>/<code>phone</code> aos contatos cadastrados em <code>units</code>. Sanitizar/templatizar o <code>html</code>.</p>
+      <p><span class="flabel">Resultado</span><strong style="color:var(--crit)">FAIL</strong> — análise estática; ver §9 sobre a limitação de rede.</p>
+    </div>
+
+    <div class="finding crit">
+      <div class="fhead">
+        <span class="fid">BUG-007</span>
+        <span class="pill p-crit">Crítico</span>
+        <span class="pill p-flow">Cadastro · LGPD</span>
+        <h3 class="ftitle">Sequestro de unidade: segundo cadastro sobrescreve o morador real</h3>
+      </div>
+      <p><span class="flabel">Problema</span>Qualquer pessoa cadastra, sem autenticação prévia. O id da unidade é determinístico — <code>MoradorRegistrationModal.tsx:203</code> monta <code>B03-A302</code> a partir do bloco e apartamento digitados. A única checagem de duplicidade é por e-mail, e só quando o registro existente já tem senha (<code>:176-183</code>).</p>
+      <p><span class="flabel">Consequência</span>Dois cadastros no mesmo bloco+apartamento geram o mesmo id, e <code>upsert</code> com <code>onConflict: 'id'</code> (<code>db.service.ts:173</code>) <strong>sobrescreve a linha do morador real</strong>: nome, telefones, e-mail e hash de senha passam a ser os do segundo. Todas as notificações futuras daquele apartamento são desviadas. Sem aviso, sem confirmação, sem log — <code>handleUpdateUnit</code> (<code>App.tsx:487-499</code>) não gera registro de auditoria.</p>
+      <p><span class="flabel">Correção</span>Vincular cadastro a uma validação de titularidade (código enviado pela portaria, ou aprovação do síndico); nunca fazer upsert cego sobre unidade já ocupada.</p>
+      <p><span class="flabel">Resultado</span><strong style="color:var(--crit)">FAIL</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span> Bugs de severidade alta</h2>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-008</span><span class="pill p-high">Alto</span><span class="pill p-flow">Modelo de dados</span>
+      <h3 class="ftitle">Não existem os estados CANCELADA, DEVOLVIDA e EXTRAVIADA</h3></div>
+      <p><code>types.ts:3</code> e o <code>CHECK</code> em <code>schema.sql:55</code> reconhecem apenas <code>RECEBIDA</code>, <code>ARMAZENADA</code> e <code>RETIRADA</code> — só o caminho feliz. Uma encomenda extraviada só pode ser fechada de duas formas: registrando uma <strong>entrega falsa com assinatura</strong>, ou deixando-a pendente para sempre, inflando o estoque e a ocupação de estante. É o pior incentivo possível num sistema cuja finalidade é prova de custódia. E <code>RECEBIDA</code>, dos três, é estado morto: nenhum código o escreve.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-009</span><span class="pill p-high">Alto</span><span class="pill p-flow">Fluxo 3 · Armazenamento</span>
+      <h3 class="ftitle">Localização não tem histórico nem sequer caminho de escrita</h3></div>
+      <p><code>packages.shelf</code> é um JSONB com a posição corrente e nada mais. Não há tabela de movimentação. Pior: <code>db.service.ts:231-243</code> lista 9 campos atualizáveis e <strong><code>shelf</code> não está entre eles</strong> — mesmo que a interface oferecesse mover a caixa, não persistiria. Quando o porteiro reorganiza a prateleira fisicamente (rotina diária), o sistema aponta a estante antiga indefinidamente, o morador recebe "Estante A1" no WhatsApp e o pacote está na C3, e o alocador passa a distribuir vagas sobre um inventário que diverge da realidade.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-010</span><span class="pill p-high">Alto</span><span class="pill p-flow">Fluxo 4 · Aviso</span>
+      <h3 class="ftitle">Falha de e-mail é gravada como SIMULATED; FAILED é inalcançável</h3></div>
+      <p>Seis condições distintas colapsam no mesmo rótulo em <code>resend-email.ts:184</code>: chave ausente no servidor, erro HTTP, recusa da Resend, timeout, offline, rota inexistente. O valor <code>'FAILED'</code> está declarado em <code>types.ts:130</code> e é literalmente inalcançável para e-mail. A escolha de palavra agrava: <code>SIMULATED</code> sugere teste deliberado — um auditor descartaria como ruído de ambiente, enquanto investigaria um <code>FAILED</code>.</p>
+      <p>O mesmo vale para push: <code>web-push.ts:87</code> grava <code>deliveredAt</code> com timestamp para algo que não foi entregue.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-011</span><span class="pill p-high">Alto</span><span class="pill p-flow">Auditoria</span>
+      <h3 class="ftitle">Trilha de auditoria é write-only e conta tentativas como sucessos</h3></div>
+      <p>O estado <code>logs</code> (<code>App.tsx:80</code>) é populado, persistido e <strong>nunca passado como prop para componente algum</strong> — nem o síndico consegue lê-la pela interface. E o que ela grava é prosa, não dado: sem valor antes/depois, com o campo <code>details</code> sempre <code>null</code>. A descrição do disparo multicanal (<code>App.tsx:374</code>) conta quantas mensagens foram <em>tentadas</em>. Com 3 telefones e todos falhando, o log permanente registra "Disparo Multicanal: 3 WhatsApp(s)".</p>
+      <p>Pior ainda: <code>App.tsx:435</code> afirma "com Assinatura Digital e Foto" incondicionalmente, mesmo quando a foto — opcional no modal — não existe. <strong>O registro de auditoria afirma um fato que pode ser falso.</strong></p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-012</span><span class="pill p-high">Alto</span><span class="pill p-flow">Fluxo 4 · Aviso</span>
+      <h3 class="ftitle">Telefone em branco vira <code>(11) 99999-0000</code> gravado como número real</h3></div>
+      <p><code>MoradorRegistrationModal.tsx:200</code> substitui telefone vazio pelo placeholder e <strong>grava no banco como se fosse do morador</strong>. A partir daí <code>residentPhones.length &gt; 0</code> é verdadeiro, o guard de <code>App.tsx:341</code> passa, e toda notificação daquela unidade vai para um número que pode pertencer a um terceiro — com nome completo, bloco, apartamento e o link de acesso do BUG-002. Não há validação de formato de telefone em ponto algum. Fallback equivalente no e-mail: <code>resend-email.ts:179</code> usa <code>morador@villageazaleia.com.br</code> como catch-all, para onde vai o comprovante com a imagem da assinatura.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-013</span><span class="pill p-high">Alto</span><span class="pill p-flow">Fluxo 1 · Entrada</span>
+      <h3 class="ftitle">Auto-registro em 2 segundos com nome divergente</h3></div>
+      <p><code>resident-matcher.service.ts:162-165</code> atribui score 86 ao caso "destinatário pode ser dependente"; <code>:245</code> define alta confiança como <code>score &gt;= 85</code>. O <code>useEffect</code> de <code>PackageIntakeFlow.tsx:118-134</code> registra sozinho após 2 segundos. Ou seja: <strong>o nome não bate e o sistema registra sem clique humano.</strong> Combinado com <code>ocr-parser.service.ts:324-329</code>, onde qualquer sequência isolada de 3 dígitos (um CEP, um número de rua, um peso) pode virar o apartamento, a encomenda vai para a unidade errada e notifica o morador errado — e ninguém confirmou nada.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-014</span><span class="pill p-high">Alto</span><span class="pill p-flow">Relatórios</span>
+      <h3 class="ftitle">Gráfico por bloco perde encomendas silenciosamente</h3></div>
+      <p><code>SindicoDashboard.tsx:161-173</code> deriva os blocos de <code>units</code>, não de <code>packages</code>. Encomenda registrada para bloco sem morador cadastrado — cenário rotineiro, produzido por <code>TotemView.tsx:97</code> e <code>PackageIntakeFlow.tsx:849</code> — <strong>não aparece em barra nenhuma</strong>. A soma das barras difere do total e o gráfico não sinaliza.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-015</span><span class="pill p-high">Alto</span><span class="pill p-flow">Relatórios</span>
+      <h3 class="ftitle">Presets de data usam UTC — depois das 21h o filtro "Hoje" mostra o dia errado</h3></div>
+      <p><code>SindicoDashboard.tsx:84</code> usa <code>toISOString().split('T')[0]</code>, que converte para UTC. Em horário de Brasília (UTC−3), das 21h às 23h59 o preset gera a data de amanhã. O síndico clica "Hoje" às 23h e a encomenda que ele registrou às 22h50 <strong>não aparece</strong> — o painel exibe zero resultados. Também afeta "Últimos 7 dias" e "Últimos 30 dias", que além disso cobrem 8 e 31 dias por serem inclusivos nas duas pontas.</p>
+      <p>O filtro manual de datas, por contraste, está correto — a comparação é entre instantes.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-016</span><span class="pill p-high">Alto</span><span class="pill p-flow">Duplicidade</span>
+      <h3 class="ftitle">Sem unicidade de rastreio em nenhuma camada</h3></div>
+      <p><code>packages_tracking_idx</code> (<code>schema.sql:75</code>) é <code>CREATE INDEX</code>, não <code>UNIQUE</code> — e o autor sabia a diferença, porque usou <code>CREATE UNIQUE INDEX</code> na linha 29. Não há checagem no frontend nem no backend. Registrar duas vezes gera duas linhas, <strong>duas rodadas de notificação</strong> (até 10 mensagens com 5 contatos), duas vagas de estante consumidas — e na retirada o <code>.find()</code> acha só a primeira, deixando a segunda pendente para sempre. Agravante: rastreio vazio vira <code>PKG-</code> + 6 dígitos do timestamp (<code>PackageIntakeFlow.tsx:245</code>), que colide a cada ~16 minutos.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-017</span><span class="pill p-high">Alto</span><span class="pill p-flow">Privacidade</span>
+      <h3 class="ftitle">Banner de push expõe dados do morador ao porteiro e ao síndico</h3></div>
+      <p><code>App.tsx:334</code> dispara <code>triggerPushNotification</code> antes de qualquer verificação de contato, alimentando um banner renderizado dentro do <code>AppShell</code> (<code>App.tsx:595</code>) — <strong>para qualquer papel logado</strong>. O porteiro e o síndico veem nome, transportadora, rastreio e localização de encomenda alheia. Vazamento por design.</p>
+      <p>Relacionado: assinaturas digitais e fotos de entrega ficam em bucket <strong>público</strong> (<code>schema.sql:171</code>), legíveis por URL. Assinatura manuscrita é dado biométrico comportamental sob a LGPD.</p>
+    </div>
+
+    <div class="finding high">
+      <div class="fhead"><span class="fid">BUG-018</span><span class="pill p-high">Alto</span><span class="pill p-flow">Notificação</span>
+      <h3 class="ftitle">Push não é push — é notificação local, inoperante no iOS</h3></div>
+      <p><code>web-push.ts:64</code> usa o construtor <code>new Notification()</code>, que só funciona com a aba aberta em primeiro plano no dispositivo do morador — exatamente o cenário em que push é desnecessário. Não existe <code>pushManager.subscribe()</code>, chave VAPID, endpoint de subscription nem listener de <code>push</code> no service worker (<code>dist/sw.js</code> tem só cache do Workbox). No Safari/iOS o construtor não é suportado: para todo morador com iPhone o canal é 100% inoperante, sempre registrando <code>SIMULATED</code>.</p>
+      <p>Mesmo assim, <code>PackageIntakeFlow.tsx:730-762</code> exibe três selos verdes com "✓" — marcas de verificação estáticas, renderizadas antes de qualquer envio.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span> Problemas de banco de dados</h2>
+
+    <p>Além do RLS (BUG-001), o schema permite <strong>estados impossíveis</strong> por ausência de constraints:</p>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Estado impossível permitido</th><th>Constraint ausente</th><th>Ocorre na prática?</th></tr></thead>
+        <tbody>
+          <tr><td><code>status='RETIRADA'</code> com <code>picked_up_at</code> nulo</td><td>CHECK condicional</td><td>Via API direta</td></tr>
+          <tr><td><code>status='RETIRADA'</code> sem <code>picked_up_by</code></td><td>CHECK condicional</td><td>Via API direta</td></tr>
+          <tr><td><code>status='ARMAZENADA'</code> com <code>stored_at</code> nulo</td><td>CHECK condicional</td><td class="v v-fail">Sim — 100% dos casos</td></tr>
+          <tr><td><code>picked_up_at &lt; received_at</code></td><td>CHECK temporal</td><td>Sim — relógios dessincronizados</td></tr>
+          <tr><td>Dois pacotes com mesmo <code>tracking_code</code></td><td>UNIQUE</td><td class="v v-fail">Sim — BUG-016</td></tr>
+          <tr><td>Dois pacotes com mesmo <code>qr_token</code></td><td>UNIQUE</td><td>Colisão a cada ~16 min</td></tr>
+          <tr><td><code>shelf</code> JSONB com forma arbitrária</td><td>CHECK de forma</td><td>Quebra contagens silenciosamente</td></tr>
+          <tr><td><code>carrier</code> fora da lista conhecida</td><td>CHECK</td><td>Quebra render em runtime</td></tr>
+          <tr><td>Log órfão apontando para pacote inexistente</td><td>FOREIGN KEY</td><td>Sim — sem FK em <code>package_id</code></td></tr>
+          <tr><td><code>lgpd_accepted = TRUE</code> sem consentimento</td><td>Remover <code>DEFAULT TRUE</code></td><td class="v v-fail">Sim — fabricado pelo default</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>Colisões de chave primária.</strong> Os IDs usam <code>Date.now()</code> — <code>pkg-${Date.now()}</code> (<code>App.tsx:300</code>) e <code>log-${Date.now()}</code> (<code>:317</code>). Dois registros no mesmo milissegundo violam a PK, o insert falha, <code>console.warn</code> engole, e a encomenda existe só na tela até o próximo refetch. <strong>Perda silenciosa de registro de auditoria e de encomenda.</strong></p>
+
+    <p><strong>Tabelas mortas.</strong> <code>multichannel_reports</code> e <code>push_notifications</code> existem no schema e <strong>nunca recebem um INSERT</strong> — <code>db.service.ts</code> não tem função de escrita para elas. A prova de que o morador foi notificado vive apenas no <code>localStorage</code> daquele navegador: limpar o cache da portaria apaga o histórico inteiro. Colunas mortas na mesma linha: <code>dispatch_report_id</code>, <code>packages.lgpd_accepted_at</code>, e <code>staff_accounts.active</code> (que existe no banco e é ignorado pelo app — desativar um porteiro não o impede de logar).</p>
+
+    <p><strong>Integridade referencial frágil.</strong> <code>packages.unit_id</code> usa <code>ON DELETE SET NULL</code>: apagar um morador orfana silenciosamente todas as encomendas dele. Para registro legal de custódia, <code>ON DELETE RESTRICT</code> é o correto.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span> Performance e volume operacional</h2>
+
+    <p>Cenário de referência: 360 unidades, 1 portaria, ~80 encomendas/dia — cerca de <strong>29.000 registros/ano</strong>.</p>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Volume</th><th>Comportamento previsto</th><th>Causa</th></tr></thead>
+        <tbody>
+          <tr><td>80/dia (uso normal)</td><td>Aceitável</td><td>—</td></tr>
+          <tr><td>500 registros</td><td>Travadas perceptíveis ao filtrar</td><td>Sem debounce; re-render completo por tecla</td></tr>
+          <tr><td>1.000 registros</td><td>Degradação clara em tablet</td><td>Sem virtualização; 1 <code>&lt;img&gt;</code> por linha sem lazy</td></tr>
+          <tr><td>5.000 registros</td><td>Aba de auditoria inviável</td><td><code>SindicoDashboard.tsx:883</code> renderiza tudo</td></tr>
+          <tr><td>10.000 históricos</td><td>Falha prática</td><td><code>SELECT *</code> sem paginação a cada evento Realtime</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Não há paginação em lugar nenhum do sistema. <code>PortariaView.tsx:244</code> usa <code>max-h-80 overflow-y-auto</code> — 320px de altura mostrando ~4 itens, com o DOM inteiro montado por trás. Cada evento Realtime dispara um <code>SELECT *</code> completo na tabela (<code>db.service.ts:205</code>): 20 registros simultâneos produzem 20 varreduras integrais.</p>
+
+    <p>Agravante de memória: <code>storage.service.ts:58-62</code> devolve o base64 original quando o upload falha. Fotos de centenas de KB entram no estado React e no <code>localStorage</code>, estourando a quota do navegador.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span> UX e operação de portaria</h2>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Pergunta operacional</th><th>Resposta medida</th></tr></thead>
+        <tbody>
+          <tr><td>Cliques para registrar uma encomenda</td><td>4 com scanner · ~6 manual · <strong>0 no auto-registro</strong></td></tr>
+          <tr><td>Passos para realizar uma retirada</td><td>5 (buscar → selecionar → nome → assinar → confirmar)</td></tr>
+          <tr><td>Confirmação antes de ação irreversível</td><td class="v v-fail">Não existe — um toque consuma</td></tr>
+          <tr><td>Proteção contra duplo clique</td><td class="v v-part">Só no modal de retirada; entrada desprotegida</td></tr>
+          <tr><td>Possibilidade de erro humano</td><td class="v v-fail">Alta — ver BUG-013</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p><strong>Alvos de toque abaixo do mínimo.</strong> <code>HandoverModal.tsx:308,317</code> usa <code>py-2.5 text-xs</code> — alvo de ~36px, contra os 44px de qualquer guideline. É justamente o botão que grava a entrega irreversível, do mesmo tamanho e ao lado do Cancelar.</p>
+
+    <p><strong>Equipamento de portaria não é suportado.</strong> Busca em todo o código: nenhum handler de tecla, nenhum <code>keydown</code>, nenhuma detecção de entrada rápida. Leitor físico de código de barras (HID keyboard-wedge) que emita Enter não confirma nada — e <code>PackageIntakeFlow.tsx:483</code> rotula o botão com "<em>(Enter)</em>", atalho que <strong>não existe no código</strong>. Impressão térmica é apenas <code>window.print()</code> (<code>DeliveryReceiptModal.tsx:48</code>), sem ESC/POS, sem WebUSB, sem <code>@media print</code> — em bobina 58/80mm sai fora de escala.</p>
+
+    <p><strong>Artefatos de demonstração em produção.</strong> <code>PackageIntakeFlow.tsx:671-679</code> tem um botão "Simular Barcode" que gera número aleatório e exibe "Código lido com sucesso pelo Scanner Barcode!". Um operador pode registrar encomenda com rastreio inventado acreditando ter escaneado. Na mesma linha, <code>:97,293</code> atribui foto aleatória de banco de imagens quando o operador não fotografa — e essa foto aparece depois na Ficha de Auditoria e no e-mail do morador como se fosse a encomenda real.</p>
+
+    <p><strong>Estados de UI.</strong> Empty states existem e são bons. <em>Loading</em> e <em>error</em> não existem: a tela renderiza vazia e depois pula para preenchida, e falha de servidor é indistinguível de operação normal.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">09</span> Testes executados e limitações</h2>
+
+    <p>Relato fiel do que foi e do que não foi verificado empiricamente.</p>
+
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Teste</th><th>Método</th><th>Resultado</th></tr></thead>
+        <tbody>
+          <tr><td>RLS — leitura anônima de 6 tabelas</td><td>Sonda HTTP contra produção</td><td class="v v-fail">FAIL — HTTP 200 em todas</td></tr>
+          <tr><td>RLS — INSERT anônimo em auditoria</td><td>Sonda HTTP</td><td class="v v-fail">FAIL — HTTP 201</td></tr>
+          <tr><td>RLS — UPDATE anônimo em auditoria</td><td>Sonda HTTP</td><td class="v v-fail">FAIL — HTTP 204</td></tr>
+          <tr><td>RLS — DELETE anônimo em auditoria</td><td>Sonda HTTP</td><td class="v v-fail">FAIL — HTTP 204</td></tr>
+          <tr><td>Exposição de <code>password_hash</code> de staff</td><td>Sonda HTTP</td><td class="v v-fail">FAIL — 2 contas com hash legível</td></tr>
+          <tr><td>Exposição de dados pessoais de moradores</td><td>Sonda HTTP</td><td class="v v-fail">FAIL — leitura livre</td></tr>
+          <tr><td>Endpoints <code>api/</code> sem autenticação</td><td>Análise estática</td><td class="v v-part">Não confirmado ativamente</td></tr>
+          <tr><td>Bypass <code>?role=sindico</code></td><td>Análise estática</td><td class="v v-part">Não confirmado ativamente</td></tr>
+          <tr><td>Fluxos E2E (login, entrada, retirada)</td><td>—</td><td class="v v-part">Não executado</td></tr>
+          <tr><td>Lighthouse / acessibilidade automatizada</td><td>—</td><td class="v v-part">Não executado</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <p><strong>Limitação declarada.</strong> Esta máquina não alcança <code>villageazaleia.vercel.app</code> — todas as tentativas retornaram <code>UND_ERR_CONNECT_TIMEOUT</code>, enquanto <code>example.com</code> e o Supabase responderam normalmente. É restrição da rede local, não do sistema auditado. Por isso os achados de endpoint e de bypass de URL estão marcados como análise estática: são conclusões de leitura de código com alta confiança, mas <strong>não foram reproduzidos contra o alvo em execução</strong>, e assim devem ser tratados até que você mesmo os confirme no navegador.</p>
+      <p>Nenhum teste automatizado (Playwright/E2E) foi criado. A auditoria priorizou o diagnóstico estrutural, conforme a instrução de não alterar código antes do diagnóstico terminar.</p>
+    </div>
+
+    <p><strong>Sobre a sonda de escrita:</strong> criei uma linha própria em <code>activity_logs</code> com id <code>AUDIT-PROBE-DELETEME</code>, executei UPDATE e DELETE sobre ela e confirmei a remoção. Nenhum dado preexistente foi lido em detalhe, alterado ou apagado. O script foi removido do projeto após a execução.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">10</span> Correções realizadas</h2>
+    <p class="lead"><strong>Nenhuma.</strong> Conforme a instrução — "não altere código até terminar o diagnóstico inicial" — a fase de correção não foi iniciada. O código está exatamente como estava antes desta auditoria.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">11</span> Ordem de correção recomendada</h2>
+
+    <p>A sequência importa. Corrigir a interface antes do banco não muda nada, porque o atacante nunca precisa passar pela sua interface.</p>
+
+    <div class="check">
+      <div><span class="box">1</span><span>Substituir as políticas RLS por regras ancoradas em identidade; tirar <code>staff_accounts</code> do alcance anônimo</span><span class="cref">BUG-001</span></div>
+      <div><span class="box">2</span><span>Remover o bloco <code>?role=</code> — poucas linhas, elimina o bypass completo</span><span class="cref">BUG-002</span></div>
+      <div><span class="box">3</span><span>Migrar autenticação para Supabase Auth; eliminar hash e contas do bundle</span><span class="cref">BUG-001</span></div>
+      <div><span class="box">4</span><span>Tornar a baixa condicional ao estado (<code>WHERE status='ARMAZENADA'</code>)</span><span class="cref">BUG-003</span></div>
+      <div><span class="box">5</span><span>Proteger os 5 endpoints com JWT, validação de papel e rate limit</span><span class="cref">BUG-006</span></div>
+      <div><span class="box">6</span><span>Fazer <code>await</code> e verificar retorno das escritas; toast só após confirmação</span><span class="cref">BUG-004</span></div>
+      <div><span class="box">7</span><span>Remover o mock do estado inicial; exibir banner de falha de conexão</span><span class="cref">BUG-004</span></div>
+      <div><span class="box">8</span><span>Token de QR aleatório, único, com expiração e consumo; validar no servidor</span><span class="cref">BUG-005</span></div>
+      <div><span class="box">9</span><span>Bloquear upsert cego sobre unidade ocupada; exigir validação de titularidade</span><span class="cref">BUG-007</span></div>
+      <div><span class="box">10</span><span>Adicionar <code>UNIQUE</code> em <code>tracking_code</code> e <code>qr_token</code>; trocar IDs por <code>randomUUID()</code></span><span class="cref">BUG-016</span></div>
+      <div><span class="box">11</span><span>Fechar o bucket; URLs assinadas para assinaturas e fotos</span><span class="cref">BUG-017</span></div>
+      <div><span class="box">12</span><span>Rotacionar credenciais de Evolution, Gemini e Resend; trocar senhas de staff</span><span class="cref">BUG-001/006</span></div>
+      <div><span class="box">13</span><span>Adicionar estados CANCELADA, DEVOLVIDA e EXTRAVIADA</span><span class="cref">BUG-008</span></div>
+      <div><span class="box">14</span><span>Persistir status de envio no banco; distinguir falha de simulação</span><span class="cref">BUG-010</span></div>
+      <div><span class="box">15</span><span>Criar caminho de escrita e histórico de movimentação de estante</span><span class="cref">BUG-009</span></div>
+      <div><span class="box">16</span><span>Corrigir presets de data para fuso local; gráfico por bloco a partir de <code>packages</code></span><span class="cref">BUG-014/015</span></div>
+      <div><span class="box">17</span><span>Remover "Simular Barcode" e fotos de amostra do fluxo de produção</span><span class="cref">§08</span></div>
+    </div>
+
+    <div class="note">
+      <p><strong>Antes de qualquer migration em produção:</strong> faça backup da tabela <code>units</code>. As migrations atuais contêm <code>ON CONFLICT DO UPDATE SET password_hash</code> (<code>schema.sql:201</code>), que <strong>reseta as senhas de staff para os valores de demonstração a cada execução</strong>, e <code>DROP POLICY</code> que sobrescreve o estado existente.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">12</span> Critérios de aceite para go-live</h2>
+
+    <div class="check">
+      <div><span class="box">☐</span><span>Fluxo completo funciona do início ao fim</span><span class="cref">parcial</span></div>
+      <div><span class="box">☐</span><span>Nenhuma encomenda pode desaparecer</span><span class="cref">BUG-004</span></div>
+      <div><span class="box">☐</span><span>Nenhuma encomenda pode ser retirada duas vezes</span><span class="cref">BUG-003</span></div>
+      <div><span class="box">☐</span><span>Histórico é confiável e imutável</span><span class="cref">BUG-001/011</span></div>
+      <div><span class="box">☐</span><span>Responsáveis são registrados de forma verificável</span><span class="cref">BUG-002</span></div>
+      <div><span class="box">☐</span><span>Localização é rastreável ao longo do tempo</span><span class="cref">BUG-009</span></div>
+      <div><span class="box">☐</span><span>Dashboard reflete o banco</span><span class="cref">BUG-004/014</span></div>
+      <div><span class="box">☐</span><span>Permissões funcionam</span><span class="cref">BUG-002</span></div>
+      <div><span class="box">☐</span><span>APIs estão protegidas</span><span class="cref">BUG-006</span></div>
+      <div><span class="box">☐</span><span>Dados pessoais não são expostos indevidamente</span><span class="cref">BUG-001/017</span></div>
+      <div><span class="box">☐</span><span>Erros são tratados e comunicados</span><span class="cref">BUG-004</span></div>
+      <div><span class="box">☐</span><span>QR Code funciona corretamente e é seguro</span><span class="cref">BUG-005</span></div>
+      <div><span class="box">☐</span><span>Sistema suporta o volume operacional</span><span class="cref">§07</span></div>
+      <div><span class="box">☐</span><span>Operações críticas protegidas contra duplicidade</span><span class="cref">BUG-016</span></div>
+      <div><span class="box done">☑</span><span>Segredos de integração fora do bundle do navegador</span><span class="cref">verificado</span></div>
+      <div><span class="box done">☑</span><span>Sincronização em tempo real entre dispositivos</span><span class="cref">verificado</span></div>
+      <div><span class="box done">☑</span><span>Build e typecheck limpos</span><span class="cref">verificado</span></div>
+    </div>
+
+    <p style="margin-top:24px"><strong>3 de 17 critérios atendidos.</strong> O sistema não deve receber dados reais de moradores até que os sete itens críticos estejam corrigidos — particularmente BUG-001 e BUG-002, que juntos tornam todos os demais controles contornáveis.</p>
+  </section>
+
+  <footer>
+    Auditoria técnica · Village Azaleia · 02/09/2026 · Diagnóstico sem alteração de código · Base de produção com 1 unidade, 2 contas de staff e 0 encomendas no momento da análise
+  </footer>
+
+</div>

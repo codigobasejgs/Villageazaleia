@@ -1,6 +1,13 @@
 export type Carrier = 'Correios' | 'Mercado Livre' | 'Amazon' | 'Shopee' | 'Loggi' | 'Outra';
 
-export type PackageStatus = 'RECEBIDA' | 'ARMAZENADA' | 'RETIRADA';
+export type PackageStatus =
+  | 'RECEBIDA'
+  | 'ARMAZENADA'
+  | 'AVISADA'
+  | 'RETIRADA'
+  | 'CANCELADA'
+  | 'DEVOLVIDA'
+  | 'EXTRAVIADA';
 
 export type ShelfLetter = 'A' | 'B' | 'C';
 export type ShelfLevel = 1 | 2 | 3 | 4;
@@ -30,20 +37,10 @@ export interface Unit {
   registeredAt?: string;
   lgpdAccepted?: boolean;
   lgpdAcceptedAt?: string;
-  /** Hash da senha de login do morador (ver src/services/auth.service.ts). */
-  passwordHash?: string;
 }
 
-export type StaffRole = 'portaria' | 'sindico';
-
-export interface StaffAccount {
-  id: string;
-  name: string;
-  email: string;
-  passwordHash: string;
-  role: StaffRole;
-  createdAt: string;
-}
+export type StaffRole = 'portaria' | 'sindico' | 'totem';
+export type AppRole = 'portaria' | 'sindico' | 'morador' | 'totem';
 
 export type AuthSession =
   | { type: 'morador'; unitId: string }
@@ -67,6 +64,8 @@ export interface PackageItem {
   pickedUpBy?: string;
   operatorName?: string;
   qrToken: string;
+  qrExpiresAt?: string;
+  qrConsumedAt?: string;
   registeredVia: 'PORTARIA' | 'TOTEM_ENTREGADOR';
   deliveryGuyName?: string;
   dispatchReportId?: string;
@@ -74,22 +73,35 @@ export interface PackageItem {
   handoverPhotoUrl?: string; // Handover photo snapshot
   receiptProtocol?: string; // e.g., "REC-VA-20260829-9281"
   receiptUrl?: string;
+  resolutionReason?: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
   lgpdAcceptedAt?: string;
 }
 
 export interface ActivityLog {
   id: string;
   timestamp: string;
+  actorId?: string;
   packageId: string;
   trackingCode: string;
   unitString: string;
-  action: 'ENTRADA' | 'ARMAZENAMENTO' | 'RETIRADA' | 'TOTEM_REGISTRO' | 'NOTIFICACAO_MULTICANAL' | 'CADASTRO_LGPD' | 'RECIBO_EMITIDO';
+  action:
+    | 'ENTRADA'
+    | 'ARMAZENAMENTO'
+    | 'RETIRADA'
+    | 'TOTEM_REGISTRO'
+    | 'NOTIFICACAO_MULTICANAL'
+    | 'CADASTRO_LGPD'
+    | 'RECIBO_EMITIDO'
+    | 'MOVIMENTACAO'
+    | 'EXCECAO';
   description: string;
   operator: string;
   details?: string;
+  beforeState?: Record<string, unknown>;
+  afterState?: Record<string, unknown>;
 }
-
-export type AppRole = 'portaria' | 'morador' | 'totem' | 'sindico';
 
 export interface PushNotification {
   id: string;

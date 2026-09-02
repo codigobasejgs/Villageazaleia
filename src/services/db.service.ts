@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Unit, PackageItem, ActivityLog, MultichannelDispatchReport, PushNotification, StaffAccount } from '../types';
+import { Unit, PackageItem, ActivityLog, MultichannelDispatchReport, PushNotification } from '../types';
 
 /**
  * Camada de dados do Supabase para o Condomínio Village Azaleia
@@ -24,8 +24,7 @@ export function mapUnitToDb(u: Unit) {
     push_enabled: u.pushEnabled ?? false,
     registered_at: u.registeredAt || new Date().toISOString(),
     lgpd_accepted: u.lgpdAccepted ?? false,
-    lgpd_accepted_at: u.lgpdAcceptedAt || null,
-    password_hash: u.passwordHash || null
+    lgpd_accepted_at: u.lgpdAcceptedAt || null
   };
 }
 
@@ -42,8 +41,7 @@ export function mapUnitFromDb(row: any): Unit {
     pushEnabled: Boolean(row.push_enabled),
     registeredAt: row.registered_at,
     lgpdAccepted: Boolean(row.lgpd_accepted),
-    lgpdAcceptedAt: row.lgpd_accepted_at,
-    passwordHash: row.password_hash || undefined
+    lgpdAcceptedAt: row.lgpd_accepted_at
   };
 }
 
@@ -104,17 +102,6 @@ export function mapPackageFromDb(row: any): PackageItem {
     receiptProtocol: row.receipt_protocol || undefined,
     receiptUrl: row.receipt_url || undefined,
     lgpdAcceptedAt: row.lgpd_accepted_at || undefined
-  };
-}
-
-export function mapStaffFromDb(row: any): StaffAccount {
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    passwordHash: row.password_hash,
-    role: row.role,
-    createdAt: row.created_at
   };
 }
 
@@ -254,19 +241,65 @@ export const dbService = {
   },
 
   /**
-   * STAFF (Portaria / Síndico)
+   * Baixa atomica via RPC `confirmar_retirada` (BUG-003 da auditoria).
+   *
+   * A operacao e atomica no Postgres (compare-and-swap + SELECT FOR UPDATE):
+   * dois porteiros confirmando ao mesmo tempo nao sobrescrevem a assinatura
+   * um do outro. O segundo recebe erro explicito e a interface avisa.
    */
-  async fetchStaffAccounts(): Promise<StaffAccount[] | null> {
+  async confirmarRetiradaAtomic(params: {
+    packageId: string;
+    qrToken?: string;
+    pickedUpBy: string;
+    signatureUrl: string;
+    handoverPhotoUrl?: string | null;
+    receiptProtocol?: string | null;
+  }): Promise<{ ok: boolean; package?: PackageItem; error?: string }> {
     try {
-      const { data, error } = await supabase.from('staff_accounts').select('*');
+      const { data, error } = await supabase.rpc('confirmar_retirada', {
+        p_package_id: params.packageId,
+        p_qr_token: params.qrToken || null,
+        p_picked_up_by: params.pickedUpBy,
+        p_signature_url: params.signatureUrl,
+        p_handover_photo_url: params.handoverPhotoUrl || null,
+        p_receipt_protocol: params.receiptProtocol || null
+      });
+
       if (error) {
-        console.warn('[Supabase] fetchStaffAccounts warning:', error.message);
-        return null;
+        return { ok: false, error: error.message };
       }
-      return (data || []).map(mapStaffFromDb);
-    } catch (err) {
-      console.warn('[Supabase] fetchStaffAccounts exception:', err);
-      return null;
+
+      return { ok: true, package: data ? mapPackageFromDb(data) : undefined };
+    } catch (err: any) {
+      return { ok: false, error: err?.message || 'Falha de comunicacao com o banco.' };
+    }
+  },
+
+  /** Movimentacao de estante com historico (BUG-009). */
+  async moverEncomenda(packageId: string, novaEstante: { shelf: string; level: number }, motivo?: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.rpc('mover_encomenda', {
+        p_package_id: packageId,
+        p_nova_estante: novaEstante,
+        p_motivo: motivo || null
+      });
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Resolucao de excecao (BUG-008: cancelada, devolvida, extraviada). */
+  async resolverExcecao(packageId: string, status: 'CANCELADA' | 'DEVOLVIDA' | 'EXTRAVIADA', motivo: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.rpc('resolver_excecao', {
+        p_package_id: packageId,
+        p_novo_status: status,
+        p_motivo: motivo
+      });
+      return !error;
+    } catch {
+      return false;
     }
   },
 

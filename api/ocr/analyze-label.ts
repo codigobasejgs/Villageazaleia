@@ -8,6 +8,7 @@
  */
 
 import { GoogleGenAI, Type } from '@google/genai';
+import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
@@ -63,6 +64,13 @@ Se algum campo não estiver legível ou não existir na etiqueta, retorne null p
 
 // Named HTTP method export (formato exigido pelo Vercel pra respostas Web-standard).
 export async function POST(request: Request): Promise<Response> {
+  const auth = await authenticateRequest(request);
+  if (!auth) return unauthorizedResponse();
+
+  if (!['portaria', 'sindico', 'totem'].includes(auth.role)) {
+    return forbiddenResponse('Apenas a portaria pode usar o OCR de etiquetas.');
+  }
+
   if (!GEMINI_API_KEY) {
     return new Response(JSON.stringify({ error: 'Gemini API não configurada no servidor.' }), {
       status: 500,

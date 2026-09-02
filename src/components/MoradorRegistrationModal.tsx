@@ -4,7 +4,7 @@ import { sound } from '../utils/audio';
 import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
 import { LGPDTermsModal } from './LGPDTermsModal';
 import { multichannelService } from '../services/notifications/multichannel.service';
-import { hashPassword } from '../services/auth.service';
+import { loginMorador } from '../services/auth.service';
 import {
   User,
   Mail,
@@ -171,18 +171,9 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
       return;
     }
 
-    let passwordHash = currentUnit?.passwordHash;
     if (isRegister) {
-      const emailTaken = units.some(
-        (u) => u.residentEmail.toLowerCase() === residentEmail.trim().toLowerCase() && Boolean(u.passwordHash)
-      );
-      if (emailTaken) {
-        setFormError('Este e-mail já possui uma conta. Volte e faça login em vez de cadastrar.');
-        sound.playError();
-        return;
-      }
-      if (password.length < 6) {
-        setFormError('A senha precisa ter no mínimo 6 caracteres.');
+      if (password.length < 8) {
+        setFormError('A senha precisa ter no mínimo 8 caracteres.');
         sound.playError();
         return;
       }
@@ -191,14 +182,15 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
         sound.playError();
         return;
       }
-      passwordHash = await hashPassword(password);
     }
 
-    // Validate phones
-    const validPhones = phones.map((p) => ({
-      ...p,
-      number: p.number.trim() || '(11) 99999-0000'
-    }));
+    // Filtra numeros vazios e placeholders (BUG-012)
+    const validPhones = phones
+      .map((p) => ({ ...p, number: p.number.trim() }))
+      .filter((p) => {
+        const clean = p.number.replace(/\D/g, '');
+        return clean.length >= 10 && !clean.includes('999990000');
+      });
 
     const unitId = `B${String(selectedBlock).padStart(2, '0')}-A${selectedApartment}`;
     const nowIso = new Date().toISOString();
@@ -208,28 +200,62 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
       block: selectedBlock,
       apartment: selectedApartment,
       residentName: residentName.trim(),
-      residentPhone: validPhones[0].number,
+      residentPhone: validPhones[0]?.number || '',
       residentPhones: validPhones,
       residentEmail: residentEmail.trim(),
       pwaInstalled: true,
       pushEnabled: true,
       registeredAt: nowIso,
       lgpdAccepted: true,
-      lgpdAcceptedAt: nowIso,
-      passwordHash
+      lgpdAcceptedAt: nowIso
     };
+
+    if (isRegister) {
+      // Cadastro seguro via backend: valida se a unidade esta livre antes de criar (BUG-007)
+      try {
+        const claimRes = await fetch('/api/units/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            block: selectedBlock,
+            apartment: selectedApartment,
+            residentName: residentName.trim(),
+            residentEmail: residentEmail.trim(),
+            residentPhone: validPhones[0]?.number || '',
+            residentPhones: validPhones,
+            password,
+            lgpdAccepted: true
+          })
+        });
+
+        const claimData = await claimRes.json();
+        if (!claimRes.ok || !claimData.ok) {
+          setFormError(claimData.error || 'Falha ao registrar unidade.');
+          sound.playError();
+          return;
+        }
+
+        // Login automatico apos o cadastro
+        await loginMorador(residentEmail.trim(), password);
+      } catch (err: any) {
+        setFormError('Erro de comunicacao com o servidor: ' + (err?.message || ''));
+        sound.playError();
+        return;
+      }
+    }
 
     onSaveUnit(updatedUnit);
     sound.playSuccess();
 
-    // Trigger instant Welcome + LGPD Confirmation via Evolution WhatsApp & Resend
+    // Dispara e-mail de boas-vindas com termo LGPD
     try {
       multichannelService.dispatchWelcomeRegistration(updatedUnit);
     } catch (err) {
       console.warn('[Welcome Registration Dispatch Error]', err);
     }
 
-    onShowToast(`Cadastro da Unidade Bloco ${selectedBlock} Apt ${selectedApartment} ativado com consentimento LGPD! Boas-vindas enviadas via WhatsApp e E-mail!`, 'success');
+    // Feedback honesto: boas-vindas sao enviadas por e-mail (BUG-010/BUG-012)
+    onShowToast(`Cadastro do Bloco ${selectedBlock} Apt ${selectedApartment} ativado com consentimento LGPD! Boas-vindas enviadas por e-mail!`, 'success');
     onClose();
   };
 

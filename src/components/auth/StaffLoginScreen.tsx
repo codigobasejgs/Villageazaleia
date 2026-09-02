@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Mail, KeyRound, AlertCircle, Shield } from 'lucide-react';
-import { StaffAccount } from '../../types';
-import { VillageAzaleiaLogo } from '../VillageAzaleiaLogo';
 import { loginStaff } from '../../services/auth.service';
 import { sound } from '../../utils/audio';
 
 interface StaffLoginScreenProps {
-  staff: StaffAccount[];
   onBack: () => void;
-  onAuthSuccess: (staff: StaffAccount) => void;
+  onAuthSuccess: (nome: string) => void;
 }
 
-export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({ staff, onBack, onAuthSuccess }) => {
+export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({ onBack, onAuthSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -22,14 +19,14 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({ staff, onBac
     setError(null);
     setIsSubmitting(true);
     try {
-      const account = await loginStaff(email, password, staff);
-      if (!account) {
+      const res = await loginStaff(email, password);
+      if (!res.ok || !res.profile) {
         sound.playError();
-        setError('E-mail ou senha inválidos. Confira suas credenciais de funcionário.');
+        setError(res.error || 'E-mail ou senha incorretos.');
         return;
       }
       sound.playSuccess();
-      onAuthSuccess(account);
+      onAuthSuccess(res.profile.name);
     } finally {
       setIsSubmitting(false);
     }

@@ -5,9 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import confetti from 'canvas-confetti';
-import { PackageItem, ActivityLog, AuthSession, Unit, StaffAccount, PushNotification, MultichannelDispatchReport } from './types';
-import { ALL_UNITS, INITIAL_PACKAGES, INITIAL_LOGS } from './data/mockData';
-import { generateSeedStaffAccounts } from './data/staffAccounts';
+import { PackageItem, ActivityLog, AuthSession, Unit, PushNotification, MultichannelDispatchReport } from './types';
 import * as authService from './services/auth.service';
 import { dbService } from './services/db.service';
 import { AppShell } from './components/layout/AppShell';
@@ -32,32 +30,19 @@ interface ToastItem {
 type PreAuthView = 'landing' | 'morador' | 'staff';
 
 export default function App() {
-  // 1. Auth session (null = ninguém logado). Persistida via src/services/auth.service.ts
-  const [session, setSession] = useState<AuthSession | null>(() => authService.getSession());
+  // 1. Sessão autenticada (null = ninguém logado). Hidratada do JWT do Supabase
+  //    no efeito de sincronização — nunca de localStorage nem de parâmetro de URL.
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [authCarregando, setAuthCarregando] = useState(true);
   const [preAuthView, setPreAuthView] = useState<PreAuthView>('landing');
   const [totemMode, setTotemMode] = useState(false);
 
-  // 2. Units state com cache local inicial e sync Supabase
-  const [units, setUnits] = useState<Unit[]>(() => {
-    try {
-      const saved = localStorage.getItem('village_azaleia_units');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Fallback
-    }
-    return ALL_UNITS;
-  });
+  // Falha de conexão com o banco: precisa ser visível, não engolida (BUG-004).
+  const [erroConexao, setErroConexao] = useState<string | null>(null);
 
-  // 3. Staff accounts (Portaria/Síndico)
-  const [staffAccounts, setStaffAccounts] = useState<StaffAccount[]>(() => {
-    try {
-      const saved = localStorage.getItem('village_azaleia_staff');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Fallback
-    }
-    return [];
-  });
+  // 2. Unidades — só o que vier do banco. Nada de cache local com dado pessoal
+  //    de morador, e nada de seed fictício exibido como se fosse real.
+  const [units, setUnits] = useState<Unit[]>([]);
 
   // 4. Sound state
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -65,27 +50,13 @@ export default function App() {
     return saved !== null ? saved === 'true' : true;
   });
 
-  // 5. Packages state com cache local inicial e sync Supabase
-  const [packages, setPackages] = useState<PackageItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('village_azaleia_packages');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Fallback
-    }
-    return INITIAL_PACKAGES;
-  });
+  // 5. Encomendas — exclusivamente do banco. O fallback anterior para
+  //    INITIAL_PACKAGES fazia 7 encomendas fictícias entrarem nos KPIs e no CSV
+  //    como se fossem reais quando o Supabase falhava (BUG-004).
+  const [packages, setPackages] = useState<PackageItem[]>([]);
 
-  // 6. Activity logs state com cache local e sync Supabase
-  const [logs, setLogs] = useState<ActivityLog[]>(() => {
-    try {
-      const saved = localStorage.getItem('village_azaleia_logs');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Fallback
-    }
-    return INITIAL_LOGS;
-  });
+  // 6. Trilha de auditoria — só do banco.
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
 
   // 7. Multichannel Dispatch Reports
   const [multichannelReports, setMultichannelReports] = useState<MultichannelDispatchReport[]>(() => {
@@ -133,34 +104,28 @@ export default function App() {
   // SUPABASE REALTIME & INITIAL FETCH
   // =========================================================================
   useEffect(() => {
-    // 1. Fetch initial remote data from Supabase
+    // Só busca dados depois que houver sessão — a RLS recusa requisição anônima,
+    // e insistir sem login só produziria erro de conexão falso na tela.
+    if (!session) return;
+
     async function initSupabaseData() {
-      // Fetch Units (inicia com os cadastrados no banco)
-      const remoteUnits = await dbService.fetchUnits();
-      if (remoteUnits) {
-        setUnits(remoteUnits);
+      const [remoteUnits, remotePackages, remoteLogs] = await Promise.all([
+        dbService.fetchUnits(),
+        dbService.fetchPackages(),
+        dbService.fetchLogs()
+      ]);
+
+      // Falha é comunicada, não engolida (BUG-004). Sem isso, banco fora do ar
+      // fica indistinguível de "condomínio sem nenhuma encomenda hoje".
+      if (remoteUnits === null || remotePackages === null) {
+        setErroConexao('Sem conexão com o servidor. Os dados exibidos podem estar desatualizados e novos registros não serão salvos.');
+        return;
       }
 
-      // Fetch Staff
-      const remoteStaff = await dbService.fetchStaffAccounts();
-      if (remoteStaff && remoteStaff.length > 0) {
-        setStaffAccounts(remoteStaff);
-      } else {
-        const seedStaff = await generateSeedStaffAccounts();
-        setStaffAccounts(seedStaff);
-      }
-
-      // Fetch Packages
-      const remotePackages = await dbService.fetchPackages();
-      if (remotePackages) {
-        setPackages(remotePackages);
-      }
-
-      // Fetch Logs
-      const remoteLogs = await dbService.fetchLogs();
-      if (remoteLogs) {
-        setLogs(remoteLogs);
-      }
+      setErroConexao(null);
+      setUnits(remoteUnits);
+      setPackages(remotePackages);
+      if (remoteLogs) setLogs(remoteLogs);
     }
 
     initSupabaseData();
@@ -184,37 +149,40 @@ export default function App() {
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [session]);
 
-  // 10. Deep link & Dev testing URL params: "?role=portaria|morador|totem|sindico&unit=B03-A102"
+  // 10. Sessão: vem SEMPRE do JWT do Supabase, nunca da URL.
+  //
+  // O bloco anterior lia "?role=sindico" e concedia a sessão sem credencial
+  // nenhuma (BUG-002 da auditoria) — bypass completo de autenticação, e o link
+  // ia dentro de toda mensagem de WhatsApp/e-mail enviada ao morador. Removido.
+  //
+  // O único parâmetro que sobrevive é "?totem=1", que apenas escolhe o layout do
+  // quiosque: ele não concede leitura de dado nenhum, porque a RLS exige uma
+  // sessão autenticada de qualquer forma.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const unitId = params.get('unit');
-    const role = params.get('role');
-
-    if (role === 'totem') {
+    if (params.get('totem') === '1') {
       setTotemMode(true);
-    } else if (role === 'portaria') {
-      const portariaAccount = staffAccounts.find((s) => s.role === 'portaria') || { id: 'staff-portaria-1', name: 'Silvio Portaria', role: 'portaria' as const };
-      setSession({ type: 'portaria', staffId: portariaAccount.id });
-    } else if (role === 'sindico') {
-      const sindicoAccount = staffAccounts.find((s) => s.role === 'sindico') || { id: 'staff-sindico-1', name: 'Marcos Síndico', role: 'sindico' as const };
-      setSession({ type: 'sindico', staffId: sindicoAccount.id });
-    } else if (role === 'morador') {
-      const targetUnitId = unitId || units[0]?.id || 'B03-A102';
-      setSession({ type: 'morador', unitId: targetUnitId });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [units, staffAccounts]);
+  }, []);
 
-  // Persist/clear session on change
+  // Hidrata a sessão a partir do Supabase e reage a expiração/refresh do token.
   useEffect(() => {
-    if (session) {
-      authService.setSession(session);
-    } else {
-      authService.clearSession();
-    }
-  }, [session]);
+    let ativo = true;
+
+    const sincronizar = async () => {
+      const s = await authService.getSession();
+      if (ativo) setSession(s);
+    };
+
+    sincronizar();
+    const cancelar = authService.onAuthChange(sincronizar);
+    return () => {
+      ativo = false;
+      cancelar();
+    };
+  }, []);
 
   // Sync sound engine
   useEffect(() => {
@@ -222,29 +190,15 @@ export default function App() {
     localStorage.setItem('village_azaleia_sound', String(soundEnabled));
   }, [soundEnabled]);
 
-  // Local storage backups
-  useEffect(() => {
-    localStorage.setItem('village_azaleia_units', JSON.stringify(units));
-  }, [units]);
-
-  useEffect(() => {
-    if (staffAccounts.length > 0) {
-      localStorage.setItem('village_azaleia_staff', JSON.stringify(staffAccounts));
-    }
-  }, [staffAccounts]);
-
-  useEffect(() => {
-    localStorage.setItem('village_azaleia_packages', JSON.stringify(packages));
-  }, [packages]);
-
-  useEffect(() => {
-    localStorage.setItem('village_azaleia_logs', JSON.stringify(logs));
-  }, [logs]);
-
-  useEffect(() => {
-    localStorage.setItem('village_azaleia_multichannel_reports', JSON.stringify(multichannelReports));
-  }, [multichannelReports]);
-
+  // Sem espelho de dados pessoais em localStorage.
+  //
+  // As cópias anteriores (units, staff, packages, logs) colocavam no disco do
+  // navegador o nome, telefone, e-mail e hash de senha de todos os moradores,
+  // além dos hashes das contas da equipe — legíveis por qualquer script na
+  // página e persistentes após o logout. O banco é a fonte de verdade; o que
+  // some no refresh é recarregado com a sessão autenticada.
+  //
+  // Só preferência de interface continua local:
   useEffect(() => {
     localStorage.setItem('village_azaleia_push_notifications', JSON.stringify(pushNotifications));
   }, [pushNotifications]);
@@ -297,8 +251,11 @@ export default function App() {
       deliveryGuyName?: string;
     }
   ) => {
-    const newId = `pkg-${Date.now()}`;
-    const qrToken = `QR-B${String(pkgData.block).padStart(2, '0')}A${pkgData.apartment}-${newId.slice(-6).toUpperCase()}`;
+    // ID e QR token criptograficamente seguros (BUG-005 / BUG-016).
+    // O token anterior usava Date.now(), previsivel em ~16 minutos e colidia.
+    const newId = `pkg-${crypto.randomUUID()}`;
+    const tokenRandom = crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase();
+    const qrToken = `VA-${tokenRandom}`;
 
     const newPackage: PackageItem = {
       ...pkgData,
@@ -309,12 +266,19 @@ export default function App() {
       registeredVia: pkgData.registeredVia || 'PORTARIA'
     };
 
-    // Optimistic state update
+    // Push no banco COM AWAIT (BUG-004) — o anterior era fire-and-forget e
+    // engolia erro, mantendo o pacote na tela quando o banco falhava.
+    const ok = await dbService.insertPackage(newPackage);
+    if (!ok) {
+      showToast('Falha ao salvar a encomenda no servidor. Verifique a conexao.', 'warning');
+      return;
+    }
+
+    // So adiciona ao state se o banco aceitou
     setPackages((prev) => [newPackage, ...prev]);
 
-    // Create log entry
     const newLog: ActivityLog = {
-      id: `log-${Date.now()}`,
+      id: `log-${crypto.randomUUID()}`,
       timestamp: new Date().toISOString(),
       packageId: newId,
       trackingCode: newPackage.trackingCode,
@@ -325,10 +289,7 @@ export default function App() {
     };
 
     setLogs((prev) => [newLog, ...prev]);
-
-    // Push to Supabase Cloud DB
-    dbService.insertPackage(newPackage);
-    dbService.insertLog(newLog);
+    await dbService.insertLog(newLog);
 
     // Push Notification Banner UI
     triggerPushNotification(newPackage);
@@ -391,16 +352,40 @@ export default function App() {
     handoverPhotoUrl?: string | null,
     receiptProtocol?: string
   ) => {
-    const now = new Date().toISOString();
     const targetPkg = packages.find((p) => p.id === pkgId);
     if (!targetPkg) return;
 
+    if (!signatureUrl) {
+      showToast('Assinatura digital e obrigatoria para a baixa.', 'warning');
+      return;
+    }
+
     const protocol = receiptProtocol || `REC-VA-${Date.now().toString().slice(-8)}`;
 
-    const updatedPackage: PackageItem = {
+    // Chamada atomica no banco (BUG-003 da auditoria).
+    // O Postgres executa SELECT FOR UPDATE + compare-and-swap e garante que se
+    // dois porteiros confirmarem ao mesmo tempo, um conclui e o outro recebe
+    // erro explicito — a assinatura do primeiro NUNCA e destruida.
+    const res = await dbService.confirmarRetiradaAtomic({
+      packageId: pkgId,
+      pickedUpBy: pickedUpBy || targetPkg.residentName,
+      signatureUrl,
+      handoverPhotoUrl,
+      receiptProtocol: protocol
+    });
+
+    if (!res.ok) {
+      showToast(res.error || 'Nao foi possivel dar baixa na encomenda.', 'warning');
+      // Sincroniza o estado local com a realidade do banco
+      const refreshed = await dbService.fetchPackages();
+      if (refreshed) setPackages(refreshed);
+      return;
+    }
+
+    const updatedPackage = res.package || {
       ...targetPkg,
-      status: 'RETIRADA',
-      pickedUpAt: now,
+      status: 'RETIRADA' as const,
+      pickedUpAt: new Date().toISOString(),
       pickedUpBy: pickedUpBy || targetPkg.residentName,
       operatorName: operatorName || targetPkg.operatorName,
       signatureUrl: signatureUrl || undefined,
@@ -408,38 +393,13 @@ export default function App() {
       receiptProtocol: protocol
     };
 
-    // Optimistic update
-    setPackages((prev) =>
-      prev.map((p) => (p.id === pkgId ? updatedPackage : p))
-    );
+    // Atualiza o state local apos confirmacao do banco (nunca otimista cego)
+    setPackages((prev) => prev.map((p) => (p.id === pkgId ? updatedPackage : p)));
 
-    // Save to Supabase DB
-    dbService.updatePackage(pkgId, {
-      status: 'RETIRADA',
-      pickedUpAt: now,
-      pickedUpBy: pickedUpBy || targetPkg.residentName,
-      operatorName: operatorName || targetPkg.operatorName,
-      signatureUrl: signatureUrl || null,
-      handoverPhotoUrl: handoverPhotoUrl || null,
-      receiptProtocol: protocol
-    });
-
-    // Audit Log 1: RETIRADA
-    const newLog: ActivityLog = {
-      id: `log-${Date.now()}`,
-      timestamp: now,
-      packageId: pkgId,
-      trackingCode: targetPkg.trackingCode,
-      unitString: `Bloco ${targetPkg.block} - Apt ${targetPkg.apartment}`,
-      action: 'RETIRADA',
-      description: `Baixa confirmada para ${pickedUpBy || targetPkg.residentName} com Assinatura Digital e Foto`,
-      operator: operatorName || 'Portaria Central'
-    };
-
-    // Audit Log 2: RECIBO_EMITIDO
+    // Audit Log 2: RECIBO_EMITIDO (o log de RETIRADA ja e gravado pela RPC no banco)
     const receiptLog: ActivityLog = {
-      id: `log-rec-${Date.now()}`,
-      timestamp: now,
+      id: `log-rec-${crypto.randomUUID()}`,
+      timestamp: new Date().toISOString(),
       packageId: pkgId,
       trackingCode: targetPkg.trackingCode,
       unitString: `Bloco ${targetPkg.block} - Apt ${targetPkg.apartment}`,
@@ -448,9 +408,8 @@ export default function App() {
       operator: 'Sistema de Protocolo Digital'
     };
 
-    setLogs((prev) => [receiptLog, newLog, ...prev]);
-    dbService.insertLog(newLog);
-    dbService.insertLog(receiptLog);
+    setLogs((prev) => [receiptLog, ...prev]);
+    await dbService.insertLog(receiptLog);
 
     // Confetti celebration on delivery
     try {
@@ -511,18 +470,22 @@ export default function App() {
     showToast('Notificação enviada ao morador via WhatsApp, E-mail e Push.', 'info');
   };
 
-  const handleMoradorAuthSuccess = (unit: Unit) => {
-    setSession({ type: 'morador', unitId: unit.id });
-    showToast(`Bem-vindo(a), ${unit.residentName}!`, 'success');
+  // Após o login o Supabase emite o JWT e onAuthChange sincroniza a sessão —
+  // estas funções só dão o feedback e nunca mais fabricam a sessão na mão.
+  const handleMoradorAuthSuccess = (nome: string) => {
+    showToast(`Bem-vindo(a), ${nome}!`, 'success');
   };
 
-  const handleStaffAuthSuccess = (staff: StaffAccount) => {
-    setSession({ type: staff.role, staffId: staff.id });
-    showToast(`Bem-vindo(a), ${staff.name}!`, 'success');
+  const handleStaffAuthSuccess = (nome: string) => {
+    showToast(`Bem-vindo(a), ${nome}!`, 'success');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await authService.clearSession();
     setSession(null);
+    setUnits([]);
+    setPackages([]);
+    setLogs([]);
     setPreAuthView('landing');
   };
 
@@ -541,8 +504,8 @@ export default function App() {
     if (session.type === 'morador') {
       return units.find((u) => u.id === session.unitId)?.residentName || 'Morador';
     }
-    return staffAccounts.find((s) => s.id === session.staffId)?.name || 'Equipe';
-  }, [session, units, staffAccounts]);
+    return session.type === 'sindico' ? 'Síndico' : 'Portaria';
+  }, [session, units]);
 
   return (
     <>
@@ -567,7 +530,6 @@ export default function App() {
           {preAuthView === 'landing' && <LandingScreen onSelect={handleLandingSelect} />}
           {preAuthView === 'morador' && (
             <MoradorAuthScreen
-              units={units}
               onBack={() => setPreAuthView('landing')}
               onSaveUnit={handleUpdateUnit}
               onAuthSuccess={handleMoradorAuthSuccess}
@@ -576,7 +538,6 @@ export default function App() {
           )}
           {preAuthView === 'staff' && (
             <StaffLoginScreen
-              staff={staffAccounts}
               onBack={() => setPreAuthView('landing')}
               onAuthSuccess={handleStaffAuthSuccess}
             />

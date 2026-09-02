@@ -1,12 +1,12 @@
 /**
  * POST /api/email/send
- * Repassa o disparo de e-mail transacional pra Resend API. A apikey nunca sai do servidor.
+ * Dispara e-mail transacional via Resend.
  *
- * Body esperado: { to: string, subject: string, html: string }
- *
- * ponytail: sem autenticação de app própria neste endpoint (mesmo caso do
- * /api/whatsapp/send). Upgrade quando houver auth de sessão real.
+ * PROTECAO: exige autenticacao de staff (portaria, sindico ou totem).
+ * Fecha o vetor de phishing aberto do BUG-006.
  */
+
+import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Village Azaleia <portaria@villageazaleia.com.br>';
@@ -14,9 +14,16 @@ const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Village Azaleia <por
 const EXTERNAL_TIMEOUT_MS = 15000;
 
 export async function POST(request: Request): Promise<Response> {
+  const auth = await authenticateRequest(request);
+  if (!auth) return unauthorizedResponse();
+
+  if (!['portaria', 'sindico', 'totem'].includes(auth.role)) {
+    return forbiddenResponse('Apenas a equipe do condominio pode disparar e-mails transacionais.');
+  }
+
   if (!RESEND_API_KEY) {
-    return new Response(JSON.stringify({ status: 'FAILED', error: 'Resend API não configurada no servidor.' }), {
-      status: 200,
+    return new Response(JSON.stringify({ status: 'FAILED', error: 'Resend API nao configurada no servidor.' }), {
+      status: 503,
       headers: { 'Content-Type': 'application/json' }
     });
   }
@@ -25,12 +32,18 @@ export async function POST(request: Request): Promise<Response> {
   try {
     body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ status: 'FAILED', error: 'Body inválido.' }), { status: 400 });
+    return new Response(JSON.stringify({ status: 'FAILED', error: 'Body JSON invalido.' }), { status: 400 });
   }
 
   const { to, subject, html } = body;
   if (!to || !subject || !html) {
-    return new Response(JSON.stringify({ status: 'FAILED', error: 'to, subject e html são obrigatórios.' }), { status: 400 });
+    return new Response(JSON.stringify({ status: 'FAILED', error: 'to, subject e html sao obrigatorios.' }), { status: 400 });
+  }
+
+  // Validacao basica de destinatario
+  if (!to.includes('@') || to.endsWith('@villageazaleia.com.br') && to.startsWith('morador@')) {
+    // Bloqueia o catch-all falso da auditoria (BUG-012)
+    return new Response(JSON.stringify({ status: 'FAILED', error: 'Destinatario nao cadastrado (placeholder).' }), { status: 400 });
   }
 
   try {
@@ -52,13 +65,13 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const errorText = await response.text();
-    return new Response(JSON.stringify({ status: 'FAILED', error: `Resend API ${response.status}: ${errorText.slice(0, 300)}` }), {
-      status: 200,
+    return new Response(JSON.stringify({ status: 'FAILED', error: `Resend API ${response.status}: ${errorText.slice(0, 200)}` }), {
+      status: 502,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ status: 'FAILED', error: err?.message || 'Erro de rede ao enviar e-mail.' }), {
-      status: 200,
+      status: 504,
       headers: { 'Content-Type': 'application/json' }
     });
   }

@@ -7,15 +7,13 @@ import { loginMorador } from '../../services/auth.service';
 import { sound } from '../../utils/audio';
 
 interface MoradorAuthScreenProps {
-  units: Unit[];
   onBack: () => void;
   onSaveUnit: (unit: Unit) => void;
-  onAuthSuccess: (unit: Unit) => void;
+  onAuthSuccess: (nome: string) => void;
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
 }
 
 export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
-  units,
   onBack,
   onSaveUnit,
   onAuthSuccess,
@@ -32,24 +30,22 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
     setError(null);
     setIsSubmitting(true);
     try {
-      const unit = await loginMorador(email, password, units);
-      if (!unit) {
+      const res = await loginMorador(email, password);
+      if (!res.ok || !res.profile) {
         sound.playError();
-        setError('E-mail ou senha inválidos. Ainda não tem conta? Use a aba Cadastrar.');
+        setError(res.error || 'E-mail ou senha incorretos. Ainda não tem conta? Use a aba Cadastrar.');
         return;
       }
       sound.playSuccess();
-      onAuthSuccess(unit);
+      onAuthSuccess(res.profile.name);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Registration happens via the existing MoradorRegistrationModal (mode="register").
-  // Saving the unit both persists it globally and logs the resident in.
   const handleRegisterSave = (unit: Unit) => {
     onSaveUnit(unit);
-    onAuthSuccess(unit);
+    onAuthSuccess(unit.residentName);
   };
 
   return (
@@ -66,17 +62,22 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
 
         <div className="bg-white rounded-3xl border-2 border-[#D4AF37] shadow-2xl overflow-hidden">
           <div className="bg-gradient-to-r from-[#061D12] via-[#0D3823] to-[#15462D] p-6 flex flex-col items-center text-center gap-1.5">
-            <VillageAzaleiaLogo variant="icon" size="md" />
-            <h2 className="text-base font-black text-white">PWA do Morador</h2>
+            <VillageAzaleiaLogo size={36} />
+            <h2 className="text-base font-black text-white">Espaço do Morador</h2>
             <p className="text-[11px] text-white/70 font-medium">Acompanhe suas encomendas em tempo real</p>
           </div>
 
-          <div className="grid grid-cols-2 border-b border-slate-200">
+          <div className="flex border-b border-slate-200">
             <button
               type="button"
-              onClick={() => setActiveTab('entrar')}
-              className={`py-3 text-xs font-black flex items-center justify-center gap-1.5 transition-colors ${
-                activeTab === 'entrar' ? 'text-[#D81B60] border-b-2 border-[#D81B60]' : 'text-slate-400 hover:text-slate-600'
+              onClick={() => {
+                setActiveTab('entrar');
+                setError(null);
+              }}
+              className={`flex-1 py-3 text-xs font-black flex items-center justify-center gap-1.5 transition-colors ${
+                activeTab === 'entrar'
+                  ? 'text-[#0D3823] border-b-2 border-[#0D3823] bg-[#E8F5E9]/40'
+                  : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               <LogIn className="w-3.5 h-3.5" />
@@ -84,9 +85,14 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('cadastrar')}
-              className={`py-3 text-xs font-black flex items-center justify-center gap-1.5 transition-colors ${
-                activeTab === 'cadastrar' ? 'text-[#D81B60] border-b-2 border-[#D81B60]' : 'text-slate-400 hover:text-slate-600'
+              onClick={() => {
+                setActiveTab('cadastrar');
+                setError(null);
+              }}
+              className={`flex-1 py-3 text-xs font-black flex items-center justify-center gap-1.5 transition-colors ${
+                activeTab === 'cadastrar'
+                  ? 'text-[#D81B60] border-b-2 border-[#D81B60] bg-[#FCE4EC]/40'
+                  : 'text-slate-400 hover:text-slate-600'
               }`}
             >
               <UserPlus className="w-3.5 h-3.5" />
@@ -94,7 +100,7 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
             </button>
           </div>
 
-          {activeTab === 'entrar' && (
+          {activeTab === 'entrar' ? (
             <form onSubmit={handleLogin} className="p-6 space-y-4">
               {error && (
                 <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
@@ -104,16 +110,16 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
               )}
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">E-mail:</label>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">E-mail cadastrado:</label>
                 <div className="relative">
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seu.email@email.com"
+                    placeholder="seu.email@exemplo.com"
                     required
                     autoComplete="username"
-                    className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold text-[#0D3823] focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20"
+                    className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold text-[#0D3823] focus:border-[#0D3823] focus:ring-2 focus:ring-[#0D3823]/20"
                   />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 </div>
@@ -129,7 +135,7 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
                     placeholder="••••••••"
                     required
                     autoComplete="current-password"
-                    className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold text-[#0D3823] focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20"
+                    className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl pl-9 pr-3 py-2.5 text-xs font-bold text-[#0D3823] focus:border-[#0D3823] focus:ring-2 focus:ring-[#0D3823]/20"
                   />
                   <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 </div>
@@ -138,32 +144,26 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-black text-xs shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#0D3823] via-[#15462D] to-[#0D3823] hover:from-[#15462D] hover:to-[#061D12] text-[#FFF2B2] font-black text-xs shadow-lg border border-[#D4AF37] transition-all active:scale-95 disabled:opacity-50"
               >
-                {isSubmitting ? 'Entrando...' : 'Entrar'}
+                {isSubmitting ? 'Entrando...' : 'Entrar no App'}
               </button>
             </form>
-          )}
-
-          {activeTab === 'cadastrar' && (
-            <div className="p-6 text-center">
-              <p className="text-xs text-slate-500">
-                Cadastre sua unidade, crie uma senha e aceite os termos LGPD para ativar as notificações.
+          ) : (
+            <div className="p-6 text-center space-y-4">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Cadastre sua unidade para receber avisos imediatos de encomendas via WhatsApp e E-mail.
               </p>
+              <MoradorRegistrationModal
+                mode="register"
+                onClose={() => setActiveTab('entrar')}
+                onSave={handleRegisterSave}
+                onShowToast={onShowToast}
+              />
             </div>
           )}
         </div>
       </div>
-
-      {/* The registration modal doubles as the "Cadastrar" screen — reused as-is, in register mode */}
-      <MoradorRegistrationModal
-        isOpen={activeTab === 'cadastrar'}
-        onClose={() => setActiveTab('entrar')}
-        units={units}
-        onSaveUnit={handleRegisterSave}
-        onShowToast={onShowToast}
-        mode="register"
-      />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import { PackageItem, Unit, WhatsappDispatchStatus } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 /**
  * Cliente WhatsApp do Village Azaleia.
@@ -18,7 +19,8 @@ export class EvolutionWhatsAppService {
       minute: '2-digit'
     });
     const formattedDate = new Date(pkg.receivedAt).toLocaleDateString('pt-BR');
-    const pwaAppUrl = typeof window !== 'undefined' ? `${window.location.origin}?unit=${pkg.unitId}&role=morador` : 'https://village-azaleia.app';
+    // Link sem ?role= (BUG-002) — o app exige login normal
+    const pwaAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://villageazaleia.vercel.app';
 
     return (
       `🌿 *CONDOMÍNIO RESIDENCIAL VILLAGE AZALEIA*\n` +
@@ -42,9 +44,15 @@ export class EvolutionWhatsAppService {
    */
   private async sendViaBackend(phone: string, text: string): Promise<'SENT' | 'FAILED'> {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || '';
+
       const response = await fetch('/api/whatsapp/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ phone, text })
       });
       if (!response.ok) return 'FAILED';
@@ -60,16 +68,17 @@ export class EvolutionWhatsAppService {
    * Dispatches "encomenda chegou" messages to all registered phone numbers for the unit (up to 5 numbers)
    */
   public async dispatchToUnit(pkg: PackageItem, unit: Unit): Promise<WhatsappDispatchStatus[]> {
-    const contacts = unit.residentPhones && unit.residentPhones.length > 0
+    const rawContacts = unit.residentPhones && unit.residentPhones.length > 0
       ? unit.residentPhones
-      : [
-          {
-            id: 'default-1',
-            label: 'Titular',
-            number: unit.residentPhone || '(11) 99999-0000',
-            isWhatsapp: true
-          }
-        ];
+      : (unit.residentPhone ? [{ id: 'default-1', label: 'Titular', number: unit.residentPhone, isWhatsapp: true }] : []);
+
+    // Filtra placeholders e numeros vazios (BUG-012)
+    const contacts = rawContacts.filter((c) => {
+      const clean = (c.number || '').replace(/\D/g, '');
+      return clean.length >= 10 && !clean.includes('999990000') && !clean.endsWith('00000000');
+    });
+
+    if (contacts.length === 0) return [];
 
     const results: WhatsappDispatchStatus[] = [];
 
@@ -98,22 +107,22 @@ export class EvolutionWhatsAppService {
    * Dispatches "encomenda retirada" (comprovante de entrega) message to all registered unit phones
    */
   public async dispatchReceiptToUnit(pkg: PackageItem, unit: Unit): Promise<WhatsappDispatchStatus[]> {
-    const contacts = unit.residentPhones && unit.residentPhones.length > 0
+    const rawContacts = unit.residentPhones && unit.residentPhones.length > 0
       ? unit.residentPhones
-      : [
-          {
-            id: 'default-1',
-            label: 'Titular',
-            number: unit.residentPhone || '(11) 99999-0000',
-            isWhatsapp: true
-          }
-        ];
+      : (unit.residentPhone ? [{ id: 'default-1', label: 'Titular', number: unit.residentPhone, isWhatsapp: true }] : []);
+
+    const contacts = rawContacts.filter((c) => {
+      const clean = (c.number || '').replace(/\D/g, '');
+      return clean.length >= 10 && !clean.includes('999990000') && !clean.endsWith('00000000');
+    });
+
+    if (contacts.length === 0) return [];
 
     const protocol = pkg.receiptProtocol || `REC-VA-${pkg.id.replace(/\D/g, '').slice(-8) || '20260829'}`;
     const pickupDate = pkg.pickedUpAt ? new Date(pkg.pickedUpAt) : new Date();
     const formattedTime = pickupDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const formattedDate = pickupDate.toLocaleDateString('pt-BR');
-    const pwaAppUrl = typeof window !== 'undefined' ? `${window.location.origin}?unit=${unit.id}&role=morador` : 'https://village-azaleia.app';
+    const pwaAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://villageazaleia.vercel.app';
 
     const results: WhatsappDispatchStatus[] = [];
 
