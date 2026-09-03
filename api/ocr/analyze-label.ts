@@ -12,8 +12,6 @@ import { GoogleGenAI, Type } from '@google/genai';
 // relativo sem extensão quebra em runtime (ERR_MODULE_NOT_FOUND) mesmo compilando de .ts.
 import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth.js';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -82,11 +80,21 @@ export async function POST(request: Request): Promise<Response> {
     return forbiddenResponse('Apenas a portaria pode usar o OCR de etiquetas.');
   }
 
-  if (!GEMINI_API_KEY) {
-    // Log explícito: sem isso o log da Vercel mostra só "500" sem mensagem, e a causa
-    // (variável de ambiente ausente em produção) fica indistinguível de um bug de código.
-    // Nunca logar o valor da chave — só o nome da variável que falta.
-    console.error('[OCR] GEMINI_API_KEY ausente no ambiente do servidor (configure na Vercel e refaça o deploy).');
+  // Lê a chave DENTRO do handler a cada requisição (evita ler undefined em cold start).
+  // Aceita variações comuns para não quebrar se na Vercel foi digitado com prefixo VITE_ ou GOOGLE_.
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENAI_API_KEY ||
+    '';
+
+  if (!apiKey) {
+    // Log detalhado das variáveis encontradas no ambiente do processo (sem expor valores)
+    const varsDisponiveis = Object.keys(process.env)
+      .filter((k) => k.includes('GEMINI') || k.includes('GOOGLE'))
+      .join(', ');
+    console.error(`[OCR] Nenhuma chave do Gemini encontrada. Variáveis relacionadas no processo: [${varsDisponiveis || 'nenhuma'}]`);
     return new Response(JSON.stringify({ error: 'Gemini API não configurada no servidor.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -110,7 +118,7 @@ export async function POST(request: Request): Promise<Response> {
   const rawBase64 = match?.[2] || body.imageBase64;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
       // gemini-3.1-pro-preview (não -flash): visão/OCR sensivelmente mais precisa em
