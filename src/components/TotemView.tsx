@@ -14,7 +14,7 @@ import { PackageIntakePayload } from './PackageIntakeFlow';
 interface TotemViewProps {
   units: Unit[];
   packages: PackageItem[];
-  onAddPackage: (pkg: PackageIntakePayload) => void;
+  onAddPackage: (pkg: PackageIntakePayload) => Promise<boolean>;
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
 }
 
@@ -45,6 +45,7 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
   const [blockInput, setBlockInput] = useState('');
   const [apartmentInput, setApartmentInput] = useState('');
   const [ticket, setTicket] = useState<RegisteredTicket | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Correspondência exata (sem sugestão/fuzzy) — só acha quando bloco+apto batem certinho.
   // Bloco é texto livre (pode ter letra, ex: "12B"), comparado sem diferenciar maiúsculas.
@@ -74,6 +75,7 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
   };
 
   const handleConfirmDelivery = async () => {
+    if (isSubmitting) return; // trava contra duplo toque
     if (!deliveryGuyName.trim()) {
       onShowToast('Informe seu nome ou a transportadora antes de confirmar.', 'warning');
       return;
@@ -85,43 +87,55 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
       return;
     }
 
-    const tracking = trackingInput.trim() || `PKG-${Date.now().toString().slice(-6)}`;
-    const shelf = shelfAllocatorService.allocateBestSlot(packages, carrier);
+    setIsSubmitting(true);
+    try {
+      const tracking = trackingInput.trim() || `PKG-${Date.now().toString().slice(-6)}`;
+      const shelf = shelfAllocatorService.allocateBestSlot(packages, carrier);
 
-    // Upload scanned photo to Supabase Storage if present
-    let finalPhotoUrl = scannedPhoto || SAMPLE_PACKAGE_PHOTOS[0];
-    if (scannedPhoto && scannedPhoto.startsWith('data:')) {
-      finalPhotoUrl = await storageService.uploadFile('packages', scannedPhoto);
+      // Upload scanned photo to Supabase Storage if present
+      let finalPhotoUrl = scannedPhoto || SAMPLE_PACKAGE_PHOTOS[0];
+      if (scannedPhoto && scannedPhoto.startsWith('data:')) {
+        finalPhotoUrl = await storageService.uploadFile('packages', scannedPhoto);
+      }
+
+      const residentName = matchedUnit?.residentName || `Morador Bloco ${block} Apto ${apartment}`;
+      const unitId = matchedUnit?.id || `B${String(block).padStart(2, '0')}-A${apartment}`;
+
+      // AGUARDA o resultado real do banco (BUG-004) — sem isso o ticket de "sucesso"
+      // aparecia mesmo quando a gravacao falhava silenciosamente (ex: sem sessao valida).
+      const ok = await onAddPackage({
+        trackingCode: tracking,
+        unitId,
+        block,
+        apartment,
+        residentName,
+        carrier,
+        shelf,
+        photoUrl: finalPhotoUrl,
+        registeredVia: 'TOTEM_ENTREGADOR',
+        deliveryGuyName: deliveryGuyName.trim(),
+        operatorName: 'Totem Central de Autoatendimento'
+      });
+
+      if (!ok) {
+        onShowToast('Não foi possível registrar a entrega. Chame a portaria.', 'warning');
+        return;
+      }
+
+      setTicket({
+        protocol: `PROT-VA-${Math.floor(100000 + Math.random() * 900000)}`,
+        block,
+        apartment,
+        residentName,
+        carrier,
+        trackingCode: tracking,
+        shelf,
+        hasContact: !!matchedUnit
+      });
+      sound.playCheckout();
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const residentName = matchedUnit?.residentName || `Morador Bloco ${block} Apto ${apartment}`;
-    const unitId = matchedUnit?.id || `B${String(block).padStart(2, '0')}-A${apartment}`;
-
-    onAddPackage({
-      trackingCode: tracking,
-      unitId,
-      block,
-      apartment,
-      residentName,
-      carrier,
-      shelf,
-      photoUrl: finalPhotoUrl,
-      registeredVia: 'TOTEM_ENTREGADOR',
-      deliveryGuyName: deliveryGuyName.trim(),
-      operatorName: 'Totem Central de Autoatendimento'
-    });
-
-    setTicket({
-      protocol: `PROT-VA-${Math.floor(100000 + Math.random() * 900000)}`,
-      block,
-      apartment,
-      residentName,
-      carrier,
-      trackingCode: tracking,
-      shelf,
-      hasContact: !!matchedUnit
-    });
-    sound.playCheckout();
   };
 
   // Reset completo (botão do cabeçalho) — encerra o atendimento deste entregador
@@ -364,10 +378,11 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
           <button
             type="button"
             onClick={handleConfirmDelivery}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-black text-base shadow-xl shadow-[#D81B60]/25 transition-all flex items-center justify-center gap-2"
+            disabled={isSubmitting}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-black text-base shadow-xl shadow-[#D81B60]/25 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <CheckCircle2 className="w-5 h-5 text-[#FFF2B2]" />
-            <span>Confirmar Entrega & Avisar Morador</span>
+            <span>{isSubmitting ? 'Registrando...' : 'Confirmar Entrega & Avisar Morador'}</span>
           </button>
         </div>
       )}

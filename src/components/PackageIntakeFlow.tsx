@@ -37,7 +37,7 @@ export type PackageIntakePayload = Omit<PackageItem, 'id' | 'status' | 'received
 interface PackageIntakeFlowProps {
   packages: PackageItem[];
   units: Unit[];
-  onAddPackage: (pkg: PackageIntakePayload) => void;
+  onAddPackage: (pkg: PackageIntakePayload) => Promise<boolean>;
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
   /** Quem está usando este fluxo: porteiro logado (Portaria) ou quiosque do entregador (Totem). */
   registeredVia: 'PORTARIA' | 'TOTEM_ENTREGADOR';
@@ -96,6 +96,7 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
   const [notes, setNotes] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<string>(SAMPLE_PACKAGE_PHOTOS[0]);
   const [isScanningSim, setIsScanningSim] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isTotem = registeredVia === 'TOTEM_ENTREGADOR';
 
@@ -233,6 +234,7 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
 
   // Core Package Registration Execution
   const handleExecuteAddPackage = async () => {
+    if (isSubmitting) return; // trava contra duplo clique/duplo toque
     if (!selectedUnit) {
       onShowToast('Selecione a Unidade/Morador de destino!', 'warning');
       return;
@@ -241,55 +243,68 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
       onShowToast('Informe seu nome ou a transportadora antes de confirmar a entrega.', 'warning');
       return;
     }
-    const tracking = trackingInput.trim() || `PKG-${Date.now().toString().slice(-6)}`;
-    const shelf: StorageLocation = { shelf: selectedShelf, level: selectedLevel };
 
-    // Upload package photo to Supabase Storage Bucket
-    let finalPhotoUrl = selectedPhoto;
-    if (selectedPhoto && selectedPhoto.startsWith('data:')) {
-      finalPhotoUrl = await storageService.uploadFile('packages', selectedPhoto);
+    setIsSubmitting(true);
+    try {
+      const tracking = trackingInput.trim() || `PKG-${Date.now().toString().slice(-6)}`;
+      const shelf: StorageLocation = { shelf: selectedShelf, level: selectedLevel };
+
+      // Upload package photo to Supabase Storage Bucket
+      let finalPhotoUrl = selectedPhoto;
+      if (selectedPhoto && selectedPhoto.startsWith('data:')) {
+        finalPhotoUrl = await storageService.uploadFile('packages', selectedPhoto);
+      }
+
+      // AGUARDA o resultado real do banco (BUG-004) — sem isso a tela afirmava
+      // "registrada com sucesso" mesmo quando a gravacao falhava silenciosamente.
+      const ok = await onAddPackage({
+        trackingCode: tracking,
+        unitId: selectedUnit.id,
+        block: selectedUnit.block,
+        apartment: selectedUnit.apartment,
+        residentName: selectedUnit.residentName,
+        carrier: selectedCarrier,
+        shelf,
+        photoUrl: finalPhotoUrl,
+        notes: notes.trim() || (lastOcrResult ? `Recepção Automatizada OCR (${selectedCarrier})` : undefined),
+        operatorName,
+        registeredVia,
+        deliveryGuyName: isTotem ? deliveryGuyName?.trim() : undefined
+      });
+
+      if (!ok) {
+        onShowToast('Não foi possível salvar a encomenda no servidor. Verifique a conexão e tente novamente.', 'warning');
+        return;
+      }
+
+      onPackageRegistered?.({
+        block: selectedUnit.block,
+        apartment: selectedUnit.apartment,
+        residentName: selectedUnit.residentName,
+        carrier: selectedCarrier,
+        trackingCode: tracking,
+        shelf
+      });
+
+      sound.playSuccess();
+      onShowToast(
+        `✓ Encomenda registrada para Bloco ${selectedUnit.block} Apt ${selectedUnit.apartment}! WhatsApp, E-mail e Push disparados em paralelo.`,
+        'success'
+      );
+
+      // Reset state ready for next package
+      setTrackingInput('');
+      setSelectedUnit(null);
+      setUnitSearchText('');
+      setNotes('');
+      setLastOcrResult(null);
+      setLastMatchResult(null);
+      setAutoConfirmCountdown(null);
+      setHighlightedFallbackField(null);
+      setSelectedPhoto(SAMPLE_PACKAGE_PHOTOS[Math.floor(Math.random() * SAMPLE_PACKAGE_PHOTOS.length)]);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    onAddPackage({
-      trackingCode: tracking,
-      unitId: selectedUnit.id,
-      block: selectedUnit.block,
-      apartment: selectedUnit.apartment,
-      residentName: selectedUnit.residentName,
-      carrier: selectedCarrier,
-      shelf,
-      photoUrl: finalPhotoUrl,
-      notes: notes.trim() || (lastOcrResult ? `Recepção Automatizada OCR (${selectedCarrier})` : undefined),
-      operatorName,
-      registeredVia,
-      deliveryGuyName: isTotem ? deliveryGuyName?.trim() : undefined
-    });
-
-    onPackageRegistered?.({
-      block: selectedUnit.block,
-      apartment: selectedUnit.apartment,
-      residentName: selectedUnit.residentName,
-      carrier: selectedCarrier,
-      trackingCode: tracking,
-      shelf
-    });
-
-    sound.playSuccess();
-    onShowToast(
-      `✓ Encomenda registrada para Bloco ${selectedUnit.block} Apt ${selectedUnit.apartment}! WhatsApp, E-mail e Push disparados em paralelo.`,
-      'success'
-    );
-
-    // Reset state ready for next package
-    setTrackingInput('');
-    setSelectedUnit(null);
-    setUnitSearchText('');
-    setNotes('');
-    setLastOcrResult(null);
-    setLastMatchResult(null);
-    setAutoConfirmCountdown(null);
-    setHighlightedFallbackField(null);
-    setSelectedPhoto(SAMPLE_PACKAGE_PHOTOS[Math.floor(Math.random() * SAMPLE_PACKAGE_PHOTOS.length)]);
   };
 
   const handleRegisterPackage = (e: React.FormEvent) => {
@@ -482,10 +497,11 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
                   <button
                     type="button"
                     onClick={handleExecuteAddPackage}
-                    className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-black text-sm shadow-xl shadow-[#D81B60]/40 border border-[#FFF2B2]/40 flex items-center justify-center gap-2 transition-all transform active:scale-98"
+                    disabled={isSubmitting}
+                    className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-black text-sm shadow-xl shadow-[#D81B60]/40 border border-[#FFF2B2]/40 flex items-center justify-center gap-2 transition-all transform active:scale-98 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-5 h-5 text-[#FFF2B2]" />
-                    <span>Confirmar Entrada Agora & Disparar Notificações (Enter)</span>
+                    <span>{isSubmitting ? 'Salvando...' : 'Confirmar Entrada Agora & Disparar Notificações'}</span>
                   </button>
 
                   <button
@@ -590,11 +606,11 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
                 <button
                   type="button"
                   onClick={handleExecuteAddPackage}
-                  disabled={!selectedUnit}
+                  disabled={!selectedUnit || isSubmitting}
                   className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40"
                 >
                   <Check className="w-4 h-4" />
-                  <span>Confirmar Entrada com Dados Selecionados</span>
+                  <span>{isSubmitting ? 'Salvando...' : 'Confirmar Entrada com Dados Selecionados'}</span>
                 </button>
               </div>
             </div>

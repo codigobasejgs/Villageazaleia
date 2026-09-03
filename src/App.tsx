@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { PackageItem, ActivityLog, AuthSession, Unit, PushNotification, MultichannelDispatchReport } from './types';
 import * as authService from './services/auth.service';
 import { dbService } from './services/db.service';
+import { supabase } from './lib/supabase';
 import { AppShell } from './components/layout/AppShell';
 import { PortariaView } from './components/PortariaView';
 import { MoradorView } from './components/MoradorView';
@@ -158,14 +159,42 @@ export default function App() {
   // ia dentro de toda mensagem de WhatsApp/e-mail enviada ao morador. Removido.
   //
   // O único parâmetro que sobrevive é "?totem=1", que apenas escolhe o layout do
-  // quiosque: ele não concede leitura de dado nenhum, porque a RLS exige uma
-  // sessão autenticada de qualquer forma.
+  // quiosque — quem concede acesso de verdade é a autenticacao silenciosa abaixo.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('totem') === '1') {
       setTotemMode(true);
     }
   }, []);
+
+  // Autentica o Totem (quiosque sem login pessoal do entregador) trocando as
+  // credenciais da conta de servico "totem" — guardadas so no servidor, nunca no
+  // bundle — por uma sessao real. Sem isso a RLS rejeitava toda escrita do quiosque
+  // (bug encontrado em producao: entrega via Totem nunca era salva no banco).
+  useEffect(() => {
+    if (!totemMode) return;
+    let cancelado = false;
+
+    (async () => {
+      const atual = await authService.getSession();
+      if (atual?.type === 'totem') return; // ja autenticado
+      try {
+        const res = await fetch('/api/totem/session', { method: 'POST', signal: AbortSignal.timeout(15000) });
+        const data = await res.json();
+        if (!res.ok || !data.access_token) {
+          if (!cancelado) showToast('Totem sem conexao com o servidor. Chame a portaria.', 'warning');
+          return;
+        }
+        await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+      } catch {
+        if (!cancelado) showToast('Totem sem conexao com o servidor. Chame a portaria.', 'warning');
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [totemMode]);
 
   // Hidrata a sessão a partir do Supabase e reage a expiração/refresh do token.
   useEffect(() => {
@@ -244,13 +273,16 @@ export default function App() {
     sound.playNotification();
   };
 
-  // Add new package (Portaria or Totem) & Trigger Supabase Insert + Multichannel Notifications
+  // Add new package (Portaria or Totem) & Trigger Supabase Insert + Multichannel Notifications.
+  // Retorna true/false — os chamadores (PackageIntakeFlow, TotemView) DEVEM aguardar (await)
+  // e so mostrar sucesso quando o retorno for true. Sem isso a tela mostrava "sucesso"
+  // mesmo quando a gravacao no banco falhava (BUG-004 da auditoria).
   const handleAddPackage = async (
     pkgData: Omit<PackageItem, 'id' | 'status' | 'receivedAt' | 'qrToken' | 'registeredVia'> & {
       registeredVia?: 'PORTARIA' | 'TOTEM_ENTREGADOR';
       deliveryGuyName?: string;
     }
-  ) => {
+  ): Promise<boolean> => {
     // ID e QR token criptograficamente seguros (BUG-005 / BUG-016).
     // O token anterior usava Date.now(), previsivel em ~16 minutos e colidia.
     const newId = `pkg-${crypto.randomUUID()}`;
@@ -271,7 +303,7 @@ export default function App() {
     const ok = await dbService.insertPackage(newPackage);
     if (!ok) {
       showToast('Falha ao salvar a encomenda no servidor. Verifique a conexao.', 'warning');
-      return;
+      return false;
     }
 
     // So adiciona ao state se o banco aceitou
@@ -316,7 +348,7 @@ export default function App() {
         `Encomenda registrada para Bloco ${newPackage.block} Apt ${newPackage.apartment}, mas o morador ainda não tem WhatsApp/e-mail cadastrado. Avise manualmente!`,
         'warning'
       );
-      return;
+      return true; // a encomenda FOI salva — so a notificacao que nao teve pra quem ir
     }
 
     try {
@@ -341,6 +373,8 @@ export default function App() {
     } catch (err) {
       console.warn('[Multichannel Dispatch Error]', err);
     }
+
+    return true;
   };
 
   // Pickup / Checkout package with digital signature, handover photo, and multichannel receipt dispatch
@@ -522,7 +556,12 @@ export default function App() {
           <div className="max-w-4xl mx-auto w-full px-4 pt-4">
             <button
               type="button"
-              onClick={() => setTotemMode(false)}
+              onClick={async () => {
+                // Encerra a sessao do totem ao sair do quiosque — nao deixa
+                // a credencial de servico "logada" fora do modo Totem.
+                await authService.clearSession();
+                setTotemMode(false);
+              }}
               className="text-xs font-bold text-[#0D3823] hover:text-[#D81B60] flex items-center gap-1.5 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />

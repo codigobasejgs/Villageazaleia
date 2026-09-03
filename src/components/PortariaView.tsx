@@ -21,7 +21,7 @@ interface PortariaViewProps {
   units: Unit[];
   /** Nome do porteiro logado (vem da sessão — ver src/services/auth.service.ts) */
   operatorName: string;
-  onAddPackage: (pkg: PackageIntakePayload) => void;
+  onAddPackage: (pkg: PackageIntakePayload) => Promise<boolean>;
   onPickupPackage: (
     pkgId: string,
     pickedUpBy: string,
