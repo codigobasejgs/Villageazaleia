@@ -72,8 +72,10 @@ export const PackageScannerOCR: React.FC<PackageScannerOCRProps> = ({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: facingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          // 1920x1080 (era 1280x720) — texto de etiqueta (rastreio, bloco/apto) é pequeno;
+          // mais resolução na captura ajuda o OCR sem custo perceptível (1 foto por vez, não vídeo).
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         },
         audio: false
       });
@@ -150,7 +152,7 @@ export const PackageScannerOCR: React.FC<PackageScannerOCRProps> = ({
         const rawCtx = rawCanvas.getContext('2d');
         if (rawCtx) {
           rawCtx.drawImage(video, 0, 0, rawCanvas.width, rawCanvas.height);
-          photoDataUrl = rawCanvas.toDataURL('image/jpeg', 0.88);
+          photoDataUrl = rawCanvas.toDataURL('image/jpeg', 0.95);
         } else {
           photoDataUrl = dataUrl;
         }
