@@ -27,7 +27,6 @@ import {
 interface MoradorRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  units: Unit[];
   currentUnit?: Unit;
   onSaveUnit: (updatedUnit: Unit, skipDbSync?: boolean) => void;
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
@@ -40,7 +39,6 @@ const PHONE_LABELS = ['Titular', 'Cônjuge', 'Filho(a)', 'Familiar', 'Outro'];
 export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> = ({
   isOpen,
   onClose,
-  units,
   currentUnit,
   onSaveUnit,
   onShowToast,
@@ -70,15 +68,16 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
       {
         id: `phone-${Date.now()}-1`,
         label: 'Titular',
-        number: currentUnit?.residentPhone || '(11) 98765-4321',
+        number: currentUnit?.residentPhone || '',
         isWhatsapp: true
       }
     ];
   });
 
-  // LGPD consent states
+  // LGPD consent states — nasce DESMARCADO em cadastro novo (consentimento é opt-in,
+  // nunca presumido). Em edição, reflete o que já foi aceito anteriormente.
   const [lgpdAccepted, setLgpdAccepted] = useState<boolean>(
-    currentUnit?.lgpdAccepted !== undefined ? currentUnit.lgpdAccepted : true
+    currentUnit?.lgpdAccepted !== undefined ? currentUnit.lgpdAccepted : false
   );
   const [isLGPDModalOpen, setIsLGPDModalOpen] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -161,6 +160,13 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
 
     if (!residentEmail.trim() || !residentEmail.includes('@')) {
       setFormError('Por favor, informe um E-mail válido para notificações via Resend.');
+      sound.playError();
+      return;
+    }
+
+    const temTelefoneValido = phones.some((p) => p.number.replace(/\D/g, '').length >= 10);
+    if (!temTelefoneValido) {
+      setFormError('Informe ao menos um telefone válido com DDD para receber avisos via WhatsApp.');
       sound.playError();
       return;
     }

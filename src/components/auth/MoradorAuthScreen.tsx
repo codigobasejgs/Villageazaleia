@@ -8,7 +8,7 @@ import { sound } from '../../utils/audio';
 
 interface MoradorAuthScreenProps {
   onBack: () => void;
-  onSaveUnit: (unit: Unit) => void;
+  onSaveUnit: (unit: Unit, skipDbSync?: boolean) => void;
   onAuthSuccess: (nome: string) => void;
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
 }
@@ -43,8 +43,8 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
     }
   };
 
-  const handleRegisterSave = (unit: Unit) => {
-    onSaveUnit(unit);
+  const handleRegisterSave = (unit: Unit, skipDbSync?: boolean) => {
+    onSaveUnit(unit, skipDbSync);
     onAuthSuccess(unit.residentName);
   };
 
@@ -155,9 +155,10 @@ export const MoradorAuthScreen: React.FC<MoradorAuthScreenProps> = ({
                 Cadastre sua unidade para receber avisos imediatos de encomendas via WhatsApp e E-mail.
               </p>
               <MoradorRegistrationModal
+                isOpen
                 mode="register"
                 onClose={() => setActiveTab('entrar')}
-                onSave={handleRegisterSave}
+                onSaveUnit={handleRegisterSave}
                 onShowToast={onShowToast}
               />
             </div>

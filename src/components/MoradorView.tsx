@@ -708,7 +708,6 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
         <MoradorRegistrationModal
           isOpen={showRegistrationModal}
           onClose={() => setShowRegistrationModal(false)}
-          units={units}
           currentUnit={currentUnit}
           onSaveUnit={(updated) => {
             if (onUpdateUnit) onUpdateUnit(updated);
