@@ -81,18 +81,30 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
     }
 
     if (extracted.block && extracted.apartment) {
-      const targetBlock = String(extracted.block).trim().toLowerCase();
-      const found = units.find(
-        (u) => String(u.block || '').trim().toLowerCase() === targetBlock && u.apartment === extracted.apartment
-      );
+      const targetBlock = String(extracted.block).trim().toUpperCase();
+      const targetApt = Number(extracted.apartment);
+
+      // Sempre preenche os campos com o que o OCR leu da etiqueta
       setBlockInput(extracted.block);
       setApartmentInput(String(extracted.apartment));
+
+      const found = units.find(
+        (u) =>
+          String(u.block || '').trim().toUpperCase() === targetBlock &&
+          Number(u.apartment) === targetApt
+      );
 
       if (found) {
         setManualOverride(false);
         setIsCountdownPaused(false);
         setAutoConfirmCountdown(AUTO_CONFIRM_SECONDS);
-        onShowToast(`Unidade identificada: Bloco ${found.block} Apto ${found.apartment} (${found.residentName})`, 'success');
+        onShowToast(`✓ Unidade identificada: Bloco ${found.block} Apto ${found.apartment} (${found.residentName})`, 'success');
+        return;
+      } else {
+        // Bloco e apartamento lidos da etiqueta, mas unidade ainda não cadastrada no condomínio
+        setAutoConfirmCountdown(null);
+        setManualOverride(true);
+        onShowToast(`OCR leu Bloco ${extracted.block} Apto ${extracted.apartment}, mas a unidade não está cadastrada. Confira abaixo.`, 'warning');
         return;
       }
     }

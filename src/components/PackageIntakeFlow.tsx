@@ -160,6 +160,9 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
 
     if (match.matchedUnit) {
       setSelectedUnit(match.matchedUnit);
+    } else if (extracted.block && extracted.apartment) {
+      // Unidade lida pelo OCR mas não cadastrada: preenche a busca para exibir o que foi lido
+      setUnitSearchText(`Bloco ${extracted.block} Apt ${extracted.apartment}`);
     }
 
     if (extracted.trackingCode) {
@@ -175,8 +178,8 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
     }
 
     // 3. Evaluation for Auto-Confirmation vs Fallback Handling
-    if (match.isHighConfidence && extracted.trackingCode && match.matchedUnit) {
-      // SUCCESS CASE (100% Zero-Digitation): Starts 2-second countdown
+    if (match.matchedUnit && extracted.trackingCode) {
+      // Unidade localizada com precisão (bloco e apto batem com o condomínio)
       setHighlightedFallbackField(null);
       setIsCountdownPaused(false);
       setAutoConfirmCountdown(2);
@@ -189,10 +192,10 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
       setAutoConfirmCountdown(null);
       if (!match.matchedUnit) {
         setHighlightedFallbackField('unit');
-        onShowToast('⚠️ OCR: Unidade não localizada com precisão. Selecione o morador sugerido abaixo.', 'warning');
+        onShowToast('⚠️ OCR: Unidade não localizada no cadastro do condomínio.', 'warning');
       } else if (!extracted.trackingCode) {
         setHighlightedFallbackField('tracking');
-        onShowToast('⚠️ OCR: Código de rastreio ilegível. Escaneie com leitor de código de barras ou confirme.', 'warning');
+        onShowToast('⚠️ OCR: Código de rastreio não localizado. Preencha ou confirme.', 'warning');
       }
     }
   };

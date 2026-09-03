@@ -141,27 +141,40 @@ export class ResidentMatcherService {
 
     // CASE 1: BOTH BLOCK AND APARTMENT ARE DETECTED
     if (extractedBlock && extractedApartment) {
+      const targetBlockNorm = String(extractedBlock).trim().toUpperCase();
+      const targetAptNum = Number(extractedApartment);
+
       const exactUnit = units.find(
-        (u) => u.block === extractedBlock && u.apartment === extractedApartment
+        (u) =>
+          String(u.block || '').trim().toUpperCase() === targetBlockNorm &&
+          Number(u.apartment) === targetAptNum
       );
 
       if (exactUnit) {
-        let score = 90;
-        let reason = `Correspondência exata de Bloco ${extractedBlock} e Apartamento ${extractedApartment}`;
+        let score = 95;
+        let reason = `Correspondência de Bloco ${extractedBlock} e Apartamento ${extractedApartment}`;
         let matchType: ResidentMatchResult['matchType'] = 'EXACT_UNIT';
 
         if (normName) {
-          const nameSim = this.calculateNameTokenSimilarity(normName, exactUnit.residentName);
-          if (nameSim >= 0.8) {
+          // Checa similaridade com o titular e com qualquer contato/familiar da residência
+          const namesToCheck = [
+            exactUnit.residentName,
+            ...(exactUnit.residentPhones || []).map((p: any) => p.label)
+          ].filter(Boolean);
+
+          let bestSim = 0;
+          for (const n of namesToCheck) {
+            const sim = this.calculateNameTokenSimilarity(normName, n);
+            if (sim > bestSim) bestSim = sim;
+          }
+
+          if (bestSim >= 0.7) {
             score = 99;
-            reason = `Correspondência 100% de Unidade (Bl ${extractedBlock} - Apt ${extractedApartment}) e Nome '${exactUnit.residentName}'`;
-            matchType = 'EXACT_UNIT';
-          } else if (nameSim >= 0.5) {
-            score = 92;
-            reason = `Unidade confirmada (Bl ${extractedBlock} - Apt ${extractedApartment}) com similaridade parcial de nome`;
+            reason = `Correspondência de Unidade (Bl ${extractedBlock} - Apt ${extractedApartment}) e Morador '${extractedName}'`;
           } else {
-            score = 86;
-            reason = `Unidade confirmada (Bl ${extractedBlock} - Apt ${extractedApartment}), destinatário '${extractedName}' pode ser dependente`;
+            // Mesmo se o nome for diferente, se o bloco e apartamento bateram, a encomenda É daquela residência!
+            score = 95;
+            reason = `Unidade confirmada (Bl ${extractedBlock} - Apt ${extractedApartment}) — destinatário: '${extractedName}'`;
           }
         }
 
