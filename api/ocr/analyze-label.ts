@@ -83,6 +83,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!GEMINI_API_KEY) {
+    // Log explícito: sem isso o log da Vercel mostra só "500" sem mensagem, e a causa
+    // (variável de ambiente ausente em produção) fica indistinguível de um bug de código.
+    // Nunca logar o valor da chave — só o nome da variável que falta.
+    console.error('[OCR] GEMINI_API_KEY ausente no ambiente do servidor (configure na Vercel e refaça o deploy).');
     return new Response(JSON.stringify({ error: 'Gemini API não configurada no servidor.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -146,6 +150,9 @@ export async function POST(request: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err: any) {
+    // Idem: erro real do Gemini (modelo inválido, cota, timeout) precisa aparecer no log,
+    // senão o cliente só vê "não consegui ler" e a causa some.
+    console.error('[OCR] Falha na chamada ao Gemini:', err?.message || err);
     return new Response(JSON.stringify({ error: err?.message || 'Erro ao analisar etiqueta com Gemini.' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

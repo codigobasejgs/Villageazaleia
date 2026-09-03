@@ -20,6 +20,15 @@ const TOTEM_PASSWORD = process.env.TOTEM_PASSWORD || '';
 
 export async function POST(): Promise<Response> {
   if (!SUPABASE_URL || !ANON_KEY || !TOTEM_EMAIL || !TOTEM_PASSWORD) {
+    // Nomeia quais variáveis faltam (só o nome, nunca o valor) — sem isso o log da Vercel
+    // mostra apenas "503" e não dá pra saber qual variável não chegou em produção.
+    const faltando = [
+      !SUPABASE_URL && 'VITE_SUPABASE_URL/SUPABASE_URL',
+      !ANON_KEY && 'VITE_SUPABASE_ANON_KEY',
+      !TOTEM_EMAIL && 'TOTEM_EMAIL',
+      !TOTEM_PASSWORD && 'TOTEM_PASSWORD'
+    ].filter(Boolean);
+    console.error('[Totem] Variaveis de ambiente ausentes em producao:', faltando.join(', '));
     return new Response(JSON.stringify({ error: 'Totem nao configurado no servidor.' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json' }
