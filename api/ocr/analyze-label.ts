@@ -8,7 +8,9 @@
  */
 
 import { GoogleGenAI, Type } from '@google/genai';
-import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth';
+// Extensão .js obrigatória: as funções rodam como ESM no Node da Vercel, onde import
+// relativo sem extensão quebra em runtime (ERR_MODULE_NOT_FOUND) mesmo compilando de .ts.
+import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth.js';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 

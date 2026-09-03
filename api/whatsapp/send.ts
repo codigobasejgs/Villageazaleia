@@ -6,7 +6,9 @@
  * Qualquer chamada sem token valido e recusada com 401/403 (fecha o gateway aberto — BUG-006).
  */
 
-import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth';
+// Extensão .js obrigatória: as funções rodam como ESM no Node da Vercel, onde import
+// relativo sem extensão quebra em runtime (ERR_MODULE_NOT_FOUND) mesmo compilando de .ts.
+import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth.js';
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || '';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';

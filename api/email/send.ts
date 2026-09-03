@@ -6,7 +6,9 @@
  * Fecha o vetor de phishing aberto do BUG-006.
  */
 
-import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth';
+// Extensão .js obrigatória: as funções rodam como ESM no Node da Vercel, onde import
+// relativo sem extensão quebra em runtime (ERR_MODULE_NOT_FOUND) mesmo compilando de .ts.
+import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth.js';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Village Azaleia <portaria@villageazaleia.com.br>';
