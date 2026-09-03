@@ -442,8 +442,11 @@ export default function App() {
     }
   };
 
-  // Update / Register a unit profile
-  const handleUpdateUnit = (updatedUnit: Unit) => {
+  // Update / Register a unit profile.
+  // skipDbSync=true quando a unidade ja foi criada no banco por outra via
+  // (ex: /api/units/claim no cadastro) — evita um upsert redundante que a
+  // RLS nova rejeitaria mesmo (morador so tem policy de UPDATE, nao INSERT).
+  const handleUpdateUnit = (updatedUnit: Unit, skipDbSync = false) => {
     setUnits((prev) => {
       const exists = prev.some((u) => u.id === updatedUnit.id || (String(u.block) === String(updatedUnit.block) && u.apartment === updatedUnit.apartment));
       if (exists) {
@@ -451,10 +454,10 @@ export default function App() {
       }
       return [updatedUnit, ...prev];
     });
-    setSession({ type: 'morador', unitId: updatedUnit.id });
 
-    // Sync to Supabase Cloud DB
-    dbService.upsertUnit(updatedUnit);
+    if (!skipDbSync) {
+      dbService.upsertUnit(updatedUnit);
+    }
   };
 
   // Push Notification Banner click

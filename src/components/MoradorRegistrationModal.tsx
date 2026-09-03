@@ -29,7 +29,7 @@ interface MoradorRegistrationModalProps {
   onClose: () => void;
   units: Unit[];
   currentUnit?: Unit;
-  onSaveUnit: (updatedUnit: Unit) => void;
+  onSaveUnit: (updatedUnit: Unit, skipDbSync?: boolean) => void;
   onShowToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
   /** 'register' pede e valida senha (novo cadastro / criação de conta). 'edit' (padrão) mantém o comportamento atual. */
   mode?: 'register' | 'edit';
@@ -244,7 +244,9 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
       }
     }
 
-    onSaveUnit(updatedUnit);
+    // No cadastro, a unidade ja foi criada no banco via /api/units/claim
+    // (com service_role) — nao repetir o upsert pelo cliente (RLS bloquearia).
+    onSaveUnit(updatedUnit, isRegister);
     sound.playSuccess();
 
     // Dispara e-mail de boas-vindas com termo LGPD
