@@ -368,6 +368,10 @@ export default function App() {
     // erro explicito — a assinatura do primeiro NUNCA e destruida.
     const res = await dbService.confirmarRetiradaAtomic({
       packageId: pkgId,
+      // targetPkg.qrToken e o valor real desta encomenda no banco — enviar sempre,
+      // independente de o porteiro ter achado por QR, rastreio ou clique na lista.
+      // Sem isso a checagem de "QR ja consumido/expirado" na RPC nunca executava.
+      qrToken: targetPkg.qrToken,
       pickedUpBy: pickedUpBy || targetPkg.residentName,
       signatureUrl,
       handoverPhotoUrl,
