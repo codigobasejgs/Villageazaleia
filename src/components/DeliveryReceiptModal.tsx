@@ -104,7 +104,7 @@ export const DeliveryReceiptModal: React.FC<DeliveryReceiptModalProps> = ({
           {/* Header */}
           <div className="border-b-2 border-[#D4AF37] pb-5 text-center space-y-2">
             <div className="flex justify-center">
-              <VillageAzaleiaLogo size="md" variant="dark" />
+              <VillageAzaleiaLogo size="md" variant="full" />
             </div>
             <div className="pt-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#E8F5E9] text-[#0D3823] border border-[#A5D6A7] text-[11px] font-black uppercase tracking-wider">
