@@ -59,8 +59,10 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
     return units.find((u) => u.id === activeUnitId) || units[0];
   }, [units, activeUnitId]);
 
-  // Packages for this unit
+  // Packages for this unit — currentUnit pode ser undefined por 1 render logo apos
+  // o cadastro/login, enquanto o fetch de units ainda nao terminou (evita crash -> tela branca).
   const myPackages = useMemo(() => {
+    if (!currentUnit) return [];
     return packages.filter((p) => String(p.block) === String(currentUnit.block) && p.apartment === currentUnit.apartment);
   }, [packages, currentUnit]);
 
@@ -74,6 +76,7 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
 
   // Filter push notifications for this unit
   const myNotifications = useMemo(() => {
+    if (!currentUnit) return [];
     return notifications.filter((n) => String(n.block) === String(currentUnit.block) && n.apartment === currentUnit.apartment);
   }, [notifications, currentUnit]);
 
@@ -100,6 +103,26 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
       setTimeout(() => setCopiedCode(null), 2000);
     }
   };
+
+  // Unidade ainda nao chegou do banco (ex: logo apos cadastro, fetch em andamento).
+  // Sem isso a JSX abaixo quebra em currentUnit.block/.residentName -> tela branca.
+  if (!currentUnit) {
+    return (
+      <div className="min-h-[calc(100dvh-4rem)] flex items-center justify-center bg-slate-50">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 mx-auto rounded-full border-4 border-[#0D3823]/20 border-t-[#0D3823] animate-spin" />
+          <p className="text-xs font-bold text-slate-500">Carregando sua unidade...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const phonesForDisplay =
+    currentUnit.residentPhones && currentUnit.residentPhones.length > 0
+      ? currentUnit.residentPhones
+      : currentUnit.residentPhone
+        ? [{ id: 'p1', label: 'Titular', number: currentUnit.residentPhone, isWhatsapp: true }]
+        : [];
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] pb-24 sm:pb-12 bg-slate-50 text-[#1A2E22]">
@@ -476,35 +499,31 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-[#0D3823] uppercase tracking-wider flex items-center gap-1.5">
                     <MessageSquare className="w-4 h-4 text-emerald-600" />
-                    <span>Telefones da Família que recebem aviso no WhatsApp ({currentUnit.residentPhones?.length || 1}/5)</span>
+                    <span>Telefones da Família que recebem aviso no WhatsApp ({phonesForDisplay.length}/5)</span>
                   </h4>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {(currentUnit.residentPhones && currentUnit.residentPhones.length > 0
-                    ? currentUnit.residentPhones
-                    : [
-                        {
-                          id: 'p1',
-                          label: 'Titular',
-                          number: currentUnit.residentPhone || '(11) 98765-4321',
-                          isWhatsapp: true
-                        }
-                      ]
-                  ).map((p, i) => (
-                    <div
-                      key={p.id || i}
-                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
-                          {p.label}
-                        </span>
-                        <span className="font-mono text-slate-800 font-bold text-xs">{p.number}</span>
+                  {phonesForDisplay.length === 0 ? (
+                    <p className="col-span-full text-xs text-slate-500 italic p-3.5 rounded-xl bg-slate-50 border border-dashed border-slate-200">
+                      Nenhum telefone cadastrado. Clique em "Editar Cadastro" para adicionar.
+                    </p>
+                  ) : (
+                    phonesForDisplay.map((p, i) => (
+                      <div
+                        key={p.id || i}
+                        className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                            {p.label}
+                          </span>
+                          <span className="font-mono text-slate-800 font-bold text-xs">{p.number}</span>
+                        </div>
+                        <span className="text-[10px] text-emerald-600 font-bold">✓ WhatsApp Ativo</span>
                       </div>
-                      <span className="text-[10px] text-emerald-600 font-bold">✓ WhatsApp Ativo</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
