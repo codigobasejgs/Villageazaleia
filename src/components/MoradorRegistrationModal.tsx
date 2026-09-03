@@ -231,7 +231,10 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
             residentPhones: validPhones,
             password,
             lgpdAccepted: true
-          })
+          }),
+          // Sem isso, o botao "carrega pra sempre" se o servidor nao responder
+          // (mesmo padrao de bug ja visto no QR do WhatsApp) — agora falha visivel em 25s.
+          signal: AbortSignal.timeout(25000)
         });
 
         const claimData = await claimRes.json();
