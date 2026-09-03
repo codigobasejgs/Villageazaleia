@@ -298,6 +298,17 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
                         </span>
                       </div>
 
+                      {/* Destinatário impresso na etiqueta (relevante quando mais de 1 pessoa mora na mesma unidade) */}
+                      {pkg.residentName && (
+                        <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                          <span className="text-slate-500 font-medium">Destinatário na etiqueta:</span>
+                          <span className="font-extrabold text-[#0D3823] flex items-center gap-1">
+                            <User className="w-3.5 h-3.5 text-[#D81B60]" />
+                            <span>{pkg.residentName}</span>
+                          </span>
+                        </div>
+                      )}
+
                       {/* Package Photo & Shelf Info */}
                       <div className="flex gap-4 items-center">
                         <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-slate-200 shrink-0 bg-slate-100 shadow-inner">
@@ -638,6 +649,11 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
               <p className="text-xs text-slate-500 font-medium">
                 QR Code oficial para retirada da encomenda
               </p>
+              {fullscreenQrPackage.residentName && (
+                <p className="text-[11px] text-[#D81B60] font-bold mt-1">
+                  Destinatário: {fullscreenQrPackage.residentName} • Qualquer morador do apartamento pode retirar
+                </p>
+              )}
             </div>
 
             {/* QR Code Display High Def */}
