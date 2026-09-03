@@ -283,7 +283,7 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
                 </div>
                 <div>
                   <span className="text-[10px] font-brand font-black text-[#FFF2B2] uppercase tracking-wider block">
-                    PWA Residencial Village Azaleia
+                    Residencial Village Azaleia
                   </span>
                   <h3 className="text-base sm:text-lg font-black text-white">
                     {isRegister ? 'Criar Minha Conta de Morador' : 'Auto-Cadastro & Gestão da Unidade'}

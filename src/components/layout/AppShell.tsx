@@ -5,11 +5,13 @@ import { sound } from '../../utils/audio';
 import { VillageAzaleiaLogo } from '../VillageAzaleiaLogo';
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 
+// Rótulos profissionais e enxutos — só o papel, nunca detalhe técnico
+// (ex: "PWA") nem nome de pessoa (ver StaffLoginScreen/App.tsx loggedInDisplayName).
 const ROLE_META: Record<AppRole, { label: string; icon: React.ReactNode }> = {
-  portaria: { label: 'Portaria / Recepção', icon: <Shield className="w-4 h-4" /> },
-  morador: { label: 'PWA Morador', icon: <Smartphone className="w-4 h-4" /> },
-  totem: { label: 'Totem Entregador', icon: <Box className="w-4 h-4" /> },
-  sindico: { label: 'Painel Síndico', icon: <BarChart3 className="w-4 h-4" /> }
+  portaria: { label: 'Porteiro', icon: <Shield className="w-4 h-4" /> },
+  morador: { label: 'Morador', icon: <Smartphone className="w-4 h-4" /> },
+  totem: { label: 'Totem', icon: <Box className="w-4 h-4" /> },
+  sindico: { label: 'Síndico', icon: <BarChart3 className="w-4 h-4" /> }
 };
 
 interface AppShellProps {

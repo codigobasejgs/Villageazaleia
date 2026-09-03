@@ -773,7 +773,7 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
                         ✓ Resend E-mail
                       </span>
                       <span className="inline-flex items-center gap-1 bg-amber-100/80 px-2 py-0.5 rounded text-amber-900 font-bold">
-                        ✓ Web Push PWA
+                        ✓ Notificação no App
                       </span>
                     </div>
                   </div>
@@ -1006,7 +1006,7 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-extrabold text-sm shadow-lg shadow-[#D81B60]/30 transition-all flex items-center justify-center gap-2 transform active:scale-[0.99] border border-[#FFF2B2]/30"
             >
               <CheckCircle2 className="w-5 h-5 text-[#FFF2B2]" />
-              <span>Registrar Encomenda & Notificar Morador no PWA</span>
+              <span>Registrar Encomenda & Notificar Morador</span>
             </button>
           </form>
         </div>

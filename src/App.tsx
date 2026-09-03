@@ -552,7 +552,7 @@ export default function App() {
     if (session.type === 'morador') {
       return units.find((u) => u.id === session.unitId)?.residentName || 'Morador';
     }
-    return session.type === 'sindico' ? 'Síndico' : 'Portaria';
+    return session.type === 'sindico' ? 'Síndico' : 'Porteiro';
   }, [session, units]);
 
   return (

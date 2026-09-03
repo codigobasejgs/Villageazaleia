@@ -85,7 +85,7 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
     const outcome = await promptInstall();
     if (outcome === 'accepted') {
       sound.playSuccess();
-      onShowToast('Village Azaleia PWA adicionado à Tela de Início!', 'success');
+      onShowToast('Village Azaleia adicionado à Tela de Início!', 'success');
     } else if (outcome === 'unavailable') {
       onShowToast(
         'Para instalar no iPhone: toque em Compartilhar e depois em "Adicionar à Tela de Início".',
@@ -137,7 +137,7 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-brand font-black text-[10px] sm:text-xs tracking-wider text-[#FFF2B2] uppercase">
-                    PWA Oficial do Morador
+                    Morador
                   </span>
                   <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
                   <span className="text-[10px] sm:text-xs text-white/80 font-medium">Condomínio Village Azaleia</span>
@@ -444,7 +444,7 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
         {/* Tab 3: Meu Cadastro & Telefones */}
         {activeTab === 'perfil' && (
           <div className="space-y-4">
-            {/* Instalar PWA — só aparece pra quem ainda não instalou */}
+            {/* Instalar app — só aparece pra quem ainda não instalou */}
             {!isInstalledPwa && (
               <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0D3823] to-[#15462D] border border-[#D4AF37]/50 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
                 <div className="flex items-center gap-3">
@@ -465,7 +465,7 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
                   onClick={handleInstallPWA}
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] hover:from-[#C5A059] hover:to-[#B38F48] text-[#061D12] text-xs font-extrabold transition-all shadow-md active:scale-95 whitespace-nowrap self-stretch sm:self-auto"
                 >
-                  {isInstallable ? 'Instalar Aplicativo PWA' : 'Como Instalar'}
+                  {isInstallable ? 'Instalar Aplicativo' : 'Como Instalar'}
                 </button>
               </div>
             )}

@@ -70,7 +70,7 @@ export const LGPDTermsModal: React.FC<LGPDTermsModalProps> = ({
             </p>
             <ul className="list-disc pl-5 space-y-1 text-slate-600">
               <li>Identificação da unidade de destino (Bloco e Apartamento) e conferência de moradores;</li>
-              <li>Envio de notificações transacionais em tempo real sobre chegada e armazenamento de encomendas via <strong>WhatsApp (Evolution API)</strong>, <strong>E-mail (Resend)</strong> e <strong>Web Push (PWA)</strong>;</li>
+              <li>Envio de notificações transacionais em tempo real sobre chegada e armazenamento de encomendas via <strong>WhatsApp (Evolution API)</strong>, <strong>E-mail (Resend)</strong> e <strong>Notificação no Aplicativo</strong>;</li>
               <li>Emissão de Comprovantes Digitais de Retirada com assinatura biométrica na tela e rastreabilidade jurídica;</li>
               <li>Prevenção a extravios, fraudes e garantia de segurança do patrimônio comum do condomínio.</li>
             </ul>
@@ -102,7 +102,7 @@ export const LGPDTermsModal: React.FC<LGPDTermsModalProps> = ({
               <span>4. Direitos do Titular (Morador)</span>
             </h4>
             <p>
-              O titular poderá, a qualquer tempo, solicitar a atualização, retificação ou exclusão de seus telefones adicionais diretamente através do PWA ou junto à Administração do condomínio quando houver desocupação ou venda da unidade.
+              O titular poderá, a qualquer tempo, solicitar a atualização, retificação ou exclusão de seus telefones adicionais diretamente através do aplicativo ou junto à Administração do condomínio quando houver desocupação ou venda da unidade.
             </p>
           </div>
 
