@@ -87,12 +87,27 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (!userRes.ok) {
-      const err = await userRes.json();
-      const m = (err.message || '').toLowerCase();
-      if (m.includes('already') || m.includes('registered')) {
+      const err = await userRes.json().catch(() => ({}));
+      // A Admin API do Supabase varia o formato do erro entre versoes: as vezes
+      // vem em `msg`, as vezes em `message`, e sempre tem `error_code` quando
+      // e um caso conhecido. Checar so `.message` deixava esse erro invisivel
+      // (campo undefined -> string vazia -> nenhuma keyword batia).
+      const rawMsg = err.msg || err.message || err.error_description || '';
+      const m = String(rawMsg).toLowerCase();
+      const isDuplicate =
+        err.error_code === 'email_exists' ||
+        userRes.status === 422 ||
+        m.includes('already') ||
+        m.includes('registered') ||
+        m.includes('exists');
+
+      if (isDuplicate) {
         return new Response(JSON.stringify({ ok: false, error: 'Este e-mail ja possui conta. Use "Entrar".' }), { status: 409 });
       }
-      return new Response(JSON.stringify({ ok: false, error: 'Falha ao criar usuario: ' + (err.message || '') }), { status: 400 });
+      return new Response(
+        JSON.stringify({ ok: false, error: 'Falha ao criar usuario' + (rawMsg ? ': ' + rawMsg : ' (sem detalhes do servidor).') }),
+        { status: 400 }
+      );
     }
 
     const userData = await userRes.json();
