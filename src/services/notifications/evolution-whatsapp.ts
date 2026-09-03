@@ -140,7 +140,6 @@ export class EvolutionWhatsAppService {
         `📦 *Transportadora:* ${pkg.carrier}\n` +
         `🔢 *Código:* ${pkg.trackingCode}\n` +
         `👤 *Retirado por:* ${pkg.pickedUpBy || pkg.residentName}\n` +
-        `🛡️ *Operador:* ${pkg.operatorName || 'Portaria'}\n` +
         `🕒 *Data/Hora:* ${formattedDate} às ${formattedTime}\n` +
         `✍️ *Assinatura Digital:* Registrada com validade jurídica (MP 2.200-2/2001)\n\n` +
         `📲 *Visualize ou baixe o recibo com foto e assinatura em seu app:*\n` +

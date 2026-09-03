@@ -26,7 +26,8 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({ onBack, onAu
         return;
       }
       sound.playSuccess();
-      onAuthSuccess(res.profile.name);
+      // Mostra so o papel, nunca o nome real da pessoa (decisao do sindico).
+      onAuthSuccess(res.profile.role === 'sindico' ? 'Síndico' : 'Porteiro');
     } finally {
       setIsSubmitting(false);
     }

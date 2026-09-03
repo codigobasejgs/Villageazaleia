@@ -50,7 +50,7 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [handoverPhoto, setHandoverPhoto] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [operator, setOperator] = useState<string>(operatorName || 'Silvio Portaria');
+  const [operator, setOperator] = useState<string>(operatorName || 'Porteiro');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Handle Photo Capture from device camera or file upload
@@ -201,7 +201,7 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
                 type="text"
                 value={operator}
                 onChange={(e) => setOperator(e.target.value)}
-                placeholder="Ex: Silvio Portaria"
+                placeholder="Ex: Porteiro"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-[#0D3823] focus:ring-2 focus:ring-[#0D3823]/20 text-xs font-bold text-slate-800 bg-white"
               />
             </div>

@@ -128,12 +128,6 @@ export class ResendEmailService {
                   <td style="padding: 6px 0; font-size: 13px; color: #718096; border-top: 1px dashed #E2E8F0;">Recebido em:</td>
                   <td style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #4A5568; text-align: right;">${formattedDate} às ${formattedTime}</td>
                 </tr>
-                ${pkg.operatorName ? `
-                <tr>
-                  <td style="padding: 6px 0; font-size: 13px; color: #718096; border-top: 1px dashed #E2E8F0;">Operador:</td>
-                  <td style="padding: 6px 0; font-size: 13px; font-weight: 600; color: #4A5568; text-align: right;">${pkg.operatorName}</td>
-                </tr>
-                ` : ''}
               </table>
             </td>
           </tr>
@@ -366,10 +360,6 @@ export class ResendEmailService {
                 <tr>
                   <td style="padding: 6px 0; font-size: 13px; color: #718096; border-top: 1px dashed #E2E8F0;">Retirado por:</td>
                   <td style="padding: 6px 0; font-size: 13px; font-weight: 800; color: #D81B60; text-align: right;">${pkg.pickedUpBy || pkg.residentName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; font-size: 13px; color: #718096; border-top: 1px dashed #E2E8F0;">Operador:</td>
-                  <td style="padding: 6px 0; font-size: 13px; font-weight: 700; color: #4A5568; text-align: right;">${pkg.operatorName || 'Portaria Central'}</td>
                 </tr>
                 <tr>
                   <td style="padding: 6px 0; font-size: 13px; color: #718096; border-top: 1px dashed #E2E8F0;">Data e Hora da Retirada:</td>
