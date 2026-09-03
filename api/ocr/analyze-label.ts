@@ -81,16 +81,16 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // Lê a chave DENTRO do handler a cada requisição (evita ler undefined em cold start).
-  // Aceita variações comuns para não quebrar se na Vercel foi digitado com prefixo VITE_ ou GOOGLE_.
-  const apiKey =
+  // Aceita variações comuns e remove aspas/espaços extras caso tenha sido colada com aspas na Vercel.
+  const rawKey =
     process.env.GEMINI_API_KEY ||
     process.env.VITE_GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.GOOGLE_GENAI_API_KEY ||
     '';
+  const apiKey = rawKey.replace(/["']/g, '').trim();
 
   if (!apiKey) {
-    // Log detalhado das variáveis encontradas no ambiente do processo (sem expor valores)
     const varsDisponiveis = Object.keys(process.env)
       .filter((k) => k.includes('GEMINI') || k.includes('GOOGLE'))
       .join(', ');
