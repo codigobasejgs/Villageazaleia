@@ -39,7 +39,7 @@ export const ShelfOccupancyMap: React.FC<ShelfOccupancyMapProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {SHELF_CONFIG.map((shelf) => {
-          const shelfPackages = pendingPackages.filter((p) => p.shelf.shelf === shelf.shelf);
+          const shelfPackages = pendingPackages.filter((p) => p.shelf?.shelf === shelf.shelf);
           return (
             <div key={shelf.shelf} className="bg-[#F8F9FA] rounded-2xl border border-[#D4AF37]/30 p-5 space-y-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-200 pb-3">
@@ -54,7 +54,7 @@ export const ShelfOccupancyMap: React.FC<ShelfOccupancyMapProps> = ({
 
               <div className="space-y-3">
                 {([4, 3, 2, 1] as ShelfLevel[]).map((level) => {
-                  const levelPackages = shelfPackages.filter((p) => p.shelf.level === level);
+                  const levelPackages = shelfPackages.filter((p) => p.shelf?.level === level);
                   const max = shelf.maxPerLevel;
                   const pct = Math.min(100, Math.round((levelPackages.length / max) * 100));
 

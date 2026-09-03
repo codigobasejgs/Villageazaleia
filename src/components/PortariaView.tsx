@@ -311,7 +311,7 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
 
                         <div className="text-right">
                           <span className="text-xs font-extrabold px-2.5 py-1 rounded bg-[#0D3823] text-[#FFF2B2] border border-[#D4AF37]/40 shadow-sm">
-                            {p.shelf.shelf}{p.shelf.level}
+                            {p.shelf?.shelf || 'A'}{p.shelf?.level || 1}
                           </span>
                           <div className="text-[10px] text-slate-500 font-semibold mt-1">{p.carrier}</div>
                         </div>
@@ -364,7 +364,7 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
                     <div className="p-3 rounded-xl bg-[#E8F5E9] border border-[#A5D6A7] flex items-center justify-between">
                       <span className="text-xs text-slate-600 font-semibold">Local de Guarda:</span>
                       <span className="text-sm font-extrabold text-[#0D3823] bg-white px-2.5 py-1 rounded-lg border border-[#A5D6A7] shadow-sm">
-                        Estante {selectedPackageForCheckout.shelf.shelf} — Prateleira {selectedPackageForCheckout.shelf.level}
+                        Estante {selectedPackageForCheckout.shelf?.shelf || 'A'} — Prateleira {selectedPackageForCheckout.shelf?.level || 1}
                       </span>
                     </div>
                   </div>

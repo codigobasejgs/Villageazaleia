@@ -18,6 +18,7 @@ import { PushNotificationBanner } from './components/PushNotificationBanner';
 import { LandingScreen } from './components/auth/LandingScreen';
 import { MoradorAuthScreen } from './components/auth/MoradorAuthScreen';
 import { StaffLoginScreen } from './components/auth/StaffLoginScreen';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { multichannelService } from './services/notifications/multichannel.service';
 import { sound } from './utils/audio';
 import { CheckCircle2, Info, AlertTriangle, X, ArrowLeft, Shield } from 'lucide-react';
@@ -603,7 +604,9 @@ export default function App() {
               </p>
             </div>
           ) : (
-            <TotemView units={units} packages={packages} onAddPackage={handleAddPackage} onShowToast={showToast} />
+            <ErrorBoundary fallbackTitle="Erro ao carregar o Totem de Autoatendimento">
+              <TotemView units={units} packages={packages} onAddPackage={handleAddPackage} onShowToast={showToast} />
+            </ErrorBoundary>
           )}
         </div>
       ) : !session ? (
@@ -642,33 +645,39 @@ export default function App() {
           />
 
           {session.type === 'portaria' && (
-            <PortariaView
-              packages={packages}
-              units={units}
-              operatorName={loggedInDisplayName}
-              onAddPackage={handleAddPackage}
-              onPickupPackage={handlePickupPackage}
-              onShowToast={showToast}
-            />
+            <ErrorBoundary fallbackTitle="Erro ao carregar a tela da Portaria">
+              <PortariaView
+                packages={packages}
+                units={units}
+                operatorName={loggedInDisplayName}
+                onAddPackage={handleAddPackage}
+                onPickupPackage={handlePickupPackage}
+                onShowToast={showToast}
+              />
+            </ErrorBoundary>
           )}
 
           {session.type === 'morador' && (
-            <MoradorView
-              packages={packages}
-              units={units}
-              activeUnitId={session.unitId}
-              onUpdateUnit={handleUpdateUnit}
-              notifications={pushNotifications}
-              onShowToast={showToast}
-            />
+            <ErrorBoundary fallbackTitle="Erro ao carregar o aplicativo do Morador">
+              <MoradorView
+                packages={packages}
+                units={units}
+                activeUnitId={session.unitId}
+                onUpdateUnit={handleUpdateUnit}
+                notifications={pushNotifications}
+                onShowToast={showToast}
+              />
+            </ErrorBoundary>
           )}
 
           {session.type === 'sindico' && (
-            <SindicoDashboard
-              packages={packages}
-              units={units}
-              onShowToast={showToast}
-            />
+            <ErrorBoundary fallbackTitle="Erro ao carregar o painel do Síndico">
+              <SindicoDashboard
+                packages={packages}
+                units={units}
+                onShowToast={showToast}
+              />
+            </ErrorBoundary>
           )}
         </AppShell>
       )}

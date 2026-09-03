@@ -58,10 +58,10 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
   // Correspondência exata (sem sugestão/fuzzy) — só acha quando bloco+apto batem certinho.
   // Bloco é texto livre (pode ter letra, ex: "12B"), comparado sem diferenciar maiúsculas.
   const matchedUnit = useMemo(() => {
-    const block = blockInput.trim();
+    const block = blockInput.trim().toLowerCase();
     const apartment = parseInt(apartmentInput, 10);
     if (!block || !apartment) return null;
-    return units.find((u) => u.block.toLowerCase() === block.toLowerCase() && u.apartment === apartment) || null;
+    return units.find((u) => String(u.block || '').trim().toLowerCase() === block && u.apartment === apartment) || null;
   }, [blockInput, apartmentInput, units]);
 
   const hasUnitTypo = blockInput.trim() !== '' && apartmentInput.trim() !== '' && !matchedUnit;
@@ -81,8 +81,9 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
     }
 
     if (extracted.block && extracted.apartment) {
+      const targetBlock = String(extracted.block).trim().toLowerCase();
       const found = units.find(
-        (u) => u.block.toLowerCase() === extracted.block!.toLowerCase() && u.apartment === extracted.apartment
+        (u) => String(u.block || '').trim().toLowerCase() === targetBlock && u.apartment === extracted.apartment
       );
       setBlockInput(extracted.block);
       setApartmentInput(String(extracted.apartment));
