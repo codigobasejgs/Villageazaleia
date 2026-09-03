@@ -174,16 +174,21 @@ export const PackageScannerOCR: React.FC<PackageScannerOCRProps> = ({
         parsedResult = ocrParserService.parseLabelText(explicitOcrText!, preprocessedDataUrl);
       } else {
         setScannerStatus('Analisando etiqueta com IA (Gemini Vision)...');
-        parsedResult = await geminiOcrService.analyzeLabelPhoto(photoDataUrl);
+        const ocrResult = await geminiOcrService.analyzeLabelPhoto(photoDataUrl);
+        parsedResult = ocrResult.data;
         if (parsedResult) {
           parsedResult = { ...parsedResult, preprocessedImageUrl: preprocessedDataUrl };
+        } else if (ocrResult.errorMessage) {
+          // Mostra a causa real (ex: "Sessão expirada", "Gemini API não configurada", "Erro 500")
+          setScannerStatus(`Falha: ${ocrResult.errorMessage}`);
         }
       }
 
       if (!parsedResult) {
-        // Gemini indisponível/falhou — cai pro parser local com texto vazio, garante que o
-        // fluxo continua (fallback manual assume a partir daqui na tela de recepção).
-        setScannerStatus('Não foi possível ler automaticamente. Preencha manualmente.');
+        // Se ainda não tiver status de erro específico configurado acima, usa o fallback genérico
+        setScannerStatus((prev) =>
+          prev.startsWith('Falha:') ? prev : 'Não foi possível ler automaticamente. Preencha manualmente.'
+        );
         parsedResult = ocrParserService.parseLabelText('', preprocessedDataUrl);
       } else {
         setScannerStatus('✓ Leitura OCR concluída com sucesso!');

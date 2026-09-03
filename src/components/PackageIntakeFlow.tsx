@@ -48,7 +48,7 @@ interface PackageIntakeFlowProps {
   onDeliveryGuyNameChange?: (name: string) => void;
   /** Disparado após o registro, além de onAddPackage — usado pelo Totem pra exibir o ticket. */
   onPackageRegistered?: (info: {
-    block: number;
+    block: string | number;
     apartment: number;
     residentName: string;
     carrier: Carrier;

@@ -20,7 +20,7 @@ import { MoradorAuthScreen } from './components/auth/MoradorAuthScreen';
 import { StaffLoginScreen } from './components/auth/StaffLoginScreen';
 import { multichannelService } from './services/notifications/multichannel.service';
 import { sound } from './utils/audio';
-import { CheckCircle2, Info, AlertTriangle, X, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, Info, AlertTriangle, X, ArrowLeft, Shield } from 'lucide-react';
 
 interface ToastItem {
   id: string;
@@ -37,6 +37,7 @@ export default function App() {
   const [authCarregando, setAuthCarregando] = useState(true);
   const [preAuthView, setPreAuthView] = useState<PreAuthView>('landing');
   const [totemMode, setTotemMode] = useState(false);
+  const [totemAuthError, setTotemAuthError] = useState<string | null>(null);
 
   // Falha de conexão com o banco: precisa ser visível, não engolida (BUG-004).
   const [erroConexao, setErroConexao] = useState<string | null>(null);
@@ -172,22 +173,37 @@ export default function App() {
   // bundle — por uma sessao real. Sem isso a RLS rejeitava toda escrita do quiosque
   // (bug encontrado em producao: entrega via Totem nunca era salva no banco).
   useEffect(() => {
-    if (!totemMode) return;
+    if (!totemMode) {
+      setTotemAuthError(null);
+      return;
+    }
     let cancelado = false;
 
     (async () => {
       const atual = await authService.getSession();
-      if (atual?.type === 'totem') return; // ja autenticado
+      if (atual?.type === 'totem') {
+        setTotemAuthError(null);
+        return; // ja autenticado
+      }
       try {
         const res = await fetch('/api/totem/session', { method: 'POST', signal: AbortSignal.timeout(15000) });
         const data = await res.json();
         if (!res.ok || !data.access_token) {
-          if (!cancelado) showToast('Totem sem conexao com o servidor. Chame a portaria.', 'warning');
+          const msg = data?.error || 'Totem sem conexão com o servidor. Chame a portaria.';
+          if (!cancelado) {
+            setTotemAuthError(msg);
+            showToast(msg, 'warning');
+          }
           return;
         }
         await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
-      } catch {
-        if (!cancelado) showToast('Totem sem conexao com o servidor. Chame a portaria.', 'warning');
+        if (!cancelado) setTotemAuthError(null);
+      } catch (err: any) {
+        const msg = err?.message || 'Totem sem conexão com o servidor. Chame a portaria.';
+        if (!cancelado) {
+          setTotemAuthError(msg);
+          showToast(msg, 'warning');
+        }
       }
     })();
 
@@ -575,7 +591,20 @@ export default function App() {
               <span>Voltar</span>
             </button>
           </div>
-          <TotemView units={units} packages={packages} onAddPackage={handleAddPackage} onShowToast={showToast} />
+          {totemAuthError ? (
+            <div className="max-w-md mx-auto w-full px-4 my-auto py-16 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto">
+                <Shield className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-extrabold text-[#0D3823]">Totem Temporariamente Indisponível</h3>
+              <p className="text-xs text-slate-600 font-medium">{totemAuthError}</p>
+              <p className="text-[11px] text-slate-400">
+                Por favor, dirija-se à portaria para registrar sua entrega diretamente com o porteiro.
+              </p>
+            </div>
+          ) : (
+            <TotemView units={units} packages={packages} onAddPackage={handleAddPackage} onShowToast={showToast} />
+          )}
         </div>
       ) : !session ? (
         // Not logged in: Landing → Morador (Entrar/Cadastrar) or Staff (Portaria/Síndico) login

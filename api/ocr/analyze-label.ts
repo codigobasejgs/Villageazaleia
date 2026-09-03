@@ -139,7 +139,7 @@ export async function POST(request: Request): Promise<Response> {
     const text = response.text;
     if (!text) {
       return new Response(JSON.stringify({ error: 'Gemini não retornou conteúdo.' }), {
-        status: 200,
+        status: 502,
         headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -150,11 +150,9 @@ export async function POST(request: Request): Promise<Response> {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err: any) {
-    // Idem: erro real do Gemini (modelo inválido, cota, timeout) precisa aparecer no log,
-    // senão o cliente só vê "não consegui ler" e a causa some.
     console.error('[OCR] Falha na chamada ao Gemini:', err?.message || err);
     return new Response(JSON.stringify({ error: err?.message || 'Erro ao analisar etiqueta com Gemini.' }), {
-      status: 200,
+      status: 502,
       headers: { 'Content-Type': 'application/json' }
     });
   }

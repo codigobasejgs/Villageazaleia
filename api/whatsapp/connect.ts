@@ -8,6 +8,9 @@
  * Nunca toca nas instâncias "codigobase" ou "tubarao" (outro projeto do usuário, mesmo servidor).
  */
 
+// Extensão .js obrigatória para runtime ESM na Vercel
+import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth.js';
+
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || '';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'village-azaleia';
@@ -43,7 +46,15 @@ function findBase64QrCode(obj: any, depth = 0): string | null {
 // Named HTTP method export (formato exigido pelo Vercel pra respostas Web-standard).
 // Com `export default`, o Vercel trata como a assinatura antiga (req, res) e IGNORA o
 // Response retornado — a requisição fica pendurada até dar 504.
-export async function POST(): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
+  // Apenas Síndico pode criar/conectar a instância do WhatsApp do condomínio.
+  // Antes estava desprotegido — qualquer pessoa podia invocar via POST direto na internet.
+  const auth = await authenticateRequest(request);
+  if (!auth) return unauthorizedResponse();
+  if (auth.role !== 'sindico') {
+    return forbiddenResponse('Apenas o síndico pode gerenciar a conexão do WhatsApp.');
+  }
+
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     return new Response(JSON.stringify({ status: 'error', error: 'Evolution API não configurada no servidor.' }), {
       status: 500,

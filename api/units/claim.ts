@@ -143,16 +143,24 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (!unitInsertRes.ok) {
-      // Rollback: remove o auth.user se o insert da unit falhar
-      await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: adminHeaders()
+      // Rollback: remove o auth.user se o insert da unit falhar (com timeout seguro)
+      try {
+        await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: adminHeaders(),
+          signal: AbortSignal.timeout(8000)
+        });
+      } catch {
+        // Log silencioso do rollback
+      }
+      return new Response(JSON.stringify({ ok: false, error: 'Nao foi possivel registrar a unidade.' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
       });
-      return new Response(JSON.stringify({ ok: false, error: 'Nao foi possivel registrar a unidade.' }), { status: 500 });
     }
 
-    // 4. Cria o perfil vinculado a unidade
-    await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/profiles`, {
+    // 4. Cria o perfil vinculado a unidade (com checagem de erro + rollback completo se falhar)
+    const profileRes = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/profiles`, {
       method: 'POST',
       headers: adminHeaders(),
       body: JSON.stringify({
@@ -164,6 +172,28 @@ export async function POST(request: Request): Promise<Response> {
       }),
       signal: AbortSignal.timeout(8000)
     });
+
+    if (!profileRes.ok) {
+      // Rollback em cadeia: apaga unit e auth.user pra nao deixar orfao
+      try {
+        await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/units?id=eq.${encodeURIComponent(unitId)}`, {
+          method: 'DELETE',
+          headers: adminHeaders(),
+          signal: AbortSignal.timeout(8000)
+        });
+        await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/users/${userId}`, {
+          method: 'DELETE',
+          headers: adminHeaders(),
+          signal: AbortSignal.timeout(8000)
+        });
+      } catch {
+        // Falha no rollback nao bloqueia resposta
+      }
+      return new Response(JSON.stringify({ ok: false, error: 'Nao foi possivel criar o perfil do morador.' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     return new Response(JSON.stringify({ ok: true, unit: unitRow }), {
       status: 201,

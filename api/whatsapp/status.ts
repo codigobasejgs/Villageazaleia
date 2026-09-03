@@ -8,6 +8,9 @@
  * Evolution (ex: "codigobase", "tubarao" — pertencem a outro projeto do usuário).
  */
 
+// Extensão .js obrigatória para runtime ESM na Vercel
+import { authenticateRequest, unauthorizedResponse, forbiddenResponse } from '../_lib/auth.js';
+
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || '';
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '';
 const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'village-azaleia';
@@ -21,7 +24,15 @@ function timeoutSignal() {
 // Named HTTP method export (formato exigido pelo Vercel pra respostas Web-standard).
 // Com `export default`, o Vercel trata como a assinatura antiga (req, res) e IGNORA o
 // Response retornado — a requisição fica pendurada até dar 504.
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  // Apenas staff (síndico ou portaria) pode consultar status da conexão WhatsApp.
+  // Antes expunha dados sensíveis como ownerJid (telefone pessoal do síndico) na internet.
+  const auth = await authenticateRequest(request);
+  if (!auth) return unauthorizedResponse();
+  if (!['sindico', 'portaria'].includes(auth.role)) {
+    return forbiddenResponse('Acesso restrito ao staff do condomínio.');
+  }
+
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     return new Response(
       JSON.stringify({ connected: false, exists: false, error: 'Evolution API não configurada no servidor.' }),
