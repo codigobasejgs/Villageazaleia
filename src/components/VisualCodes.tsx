@@ -1,6 +1,16 @@
 import React, { useMemo } from 'react';
+import QRCode from 'qrcode';
 
-// Generates an authentic, deterministic SVG 2D QR Code Matrix pattern based on string input
+/**
+ * QR Code real (biblioteca `qrcode`, matriz gerada via QRCode.create — síncrono,
+ * sem I/O) — renderizado como SVG de células, mesmo estilo visual de antes.
+ *
+ * ATENÇÃO: a versão anterior deste componente desenhava um padrão SVG decorativo
+ * (hash pseudo-aleatório) que SÓ PARECIA um QR Code — não continha nenhuma
+ * codificação Reed-Solomon real, então nenhum leitor (câmera da portaria, jsQR)
+ * jamais conseguiria decodificá-lo. Era a causa raiz do porteiro nunca
+ * conseguir escanear o QR do morador.
+ */
 export const QRCodeDisplay: React.FC<{ value: string; size?: number; className?: string; fgColor?: string; bgColor?: string }> = ({
   value,
   size = 160,
@@ -8,89 +18,29 @@ export const QRCodeDisplay: React.FC<{ value: string; size?: number; className?:
   fgColor = '#0F172A',
   bgColor = '#FFFFFF'
 }) => {
-  const matrix = useMemo(() => {
-    // Generate deterministic 21x21 QR Code grid
-    const dim = 21;
-    const grid: boolean[][] = Array(dim).fill(false).map(() => Array(dim).fill(false));
-
-    // Corner position markers (7x7 squares)
-    const drawFinder = (startX: number, startY: number) => {
-      for (let r = 0; r < 7; r++) {
-        for (let c = 0; c < 7; c++) {
-          if (
-            r === 0 || r === 6 || c === 0 || c === 6 || // outer border
-            (r >= 2 && r <= 4 && c >= 2 && c <= 4) // center 3x3
-          ) {
-            grid[startY + r][startX + c] = true;
-          }
-        }
-      }
-    };
-
-    // Top-left, Top-right, Bottom-left finders
-    drawFinder(0, 0);
-    drawFinder(dim - 7, 0);
-    drawFinder(0, dim - 7);
-
-    // Timing patterns
-    for (let i = 8; i < dim - 8; i++) {
-      grid[6][i] = i % 2 === 0;
-      grid[i][6] = i % 2 === 0;
-    }
-
-    // Small alignment pattern
-    const alignX = 14, alignY = 14;
-    for (let r = -1; r <= 1; r++) {
-      for (let c = -1; c <= 1; c++) {
-        grid[alignY + r][alignX + c] = (Math.abs(r) === 1 || Math.abs(c) === 1 || (r === 0 && c === 0));
-      }
-    }
-
-    // Pseudo-random data bits based on input hash
-    let hash = 0;
-    for (let i = 0; i < value.length; i++) {
-      hash = ((hash << 5) - hash) + value.charCodeAt(i);
-      hash |= 0;
-    }
-
-    // Fill data area
-    for (let r = 0; r < dim; r++) {
-      for (let c = 0; c < dim; c++) {
-        // Skip finder areas
-        if (
-          (r < 8 && c < 8) ||
-          (r < 8 && c >= dim - 8) ||
-          (r >= dim - 8 && c < 8) ||
-          (r === 6 || c === 6)
-        ) {
-          continue;
-        }
-
-        const seed = Math.sin(hash * 999 + r * 31 + c * 17) * 10000;
-        grid[r][c] = (seed - Math.floor(seed)) > 0.45;
-      }
-    }
-
-    return grid;
-  }, [value]);
-
-  const cellSize = size / 21;
+  const qr = useMemo(() => QRCode.create(value, { errorCorrectionLevel: 'M' }), [value]);
+  const dim = qr.modules.size;
+  // Quiet zone de 4 módulos (mínimo da spec ISO/IEC 18004) desenhada dentro do próprio
+  // SVG — não depender só do padding CSS ao redor, porque quem lê é a câmera de OUTRO
+  // aparelho fotografando a tela, e sem essa margem branca o detector do leitor falha.
+  const QUIET_MODULES = 4;
+  const totalModules = dim + QUIET_MODULES * 2;
+  const cellSize = size / totalModules;
 
   return (
     <div className={`inline-flex flex-col items-center justify-center p-3 rounded-xl bg-white shadow-sm border border-slate-200 ${className}`}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rounded-md">
         <rect width={size} height={size} fill={bgColor} />
-        {matrix.map((row, r) =>
-          row.map((active, c) =>
-            active ? (
+        {Array.from({ length: dim }).map((_, r) =>
+          Array.from({ length: dim }).map((_, c) =>
+            qr.modules.get(r, c) ? (
               <rect
                 key={`${r}-${c}`}
-                x={c * cellSize}
-                y={r * cellSize}
+                x={(c + QUIET_MODULES) * cellSize}
+                y={(r + QUIET_MODULES) * cellSize}
                 width={cellSize + 0.2}
                 height={cellSize + 0.2}
                 fill={fgColor}
-                rx={0.5}
               />
             ) : null
           )

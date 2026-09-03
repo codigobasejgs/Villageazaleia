@@ -44,7 +44,6 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
   onShowToast,
   mode = 'edit'
 }) => {
-  if (!isOpen) return null;
   const isRegister = mode === 'register';
 
   // Bloco & Apartamento — sempre digitados pelo morador, sem valor sugerido/pré-selecionado
@@ -82,6 +81,10 @@ export const MoradorRegistrationModal: React.FC<MoradorRegistrationModalProps> =
   const [isLGPDModalOpen, setIsLGPDModalOpen] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Hooks sempre chamados antes de qualquer return condicional (regra dos hooks) —
+  // este modal nunca desmonta de fato, só alterna isOpen; um return antes dos
+  // useState mudava a contagem de hooks entre renders e corrompia o estado do form.
+  if (!isOpen) return null;
 
   // Add phone number (up to 5)
   const handleAddPhone = () => {

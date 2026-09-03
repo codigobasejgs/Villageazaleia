@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PackageItem, Unit } from '../types';
 import { SignaturePad } from './SignaturePad';
 import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
@@ -44,14 +44,31 @@ export const HandoverModal: React.FC<HandoverModalProps> = ({
   onConfirmHandover,
   onShowToast
 }) => {
-  if (!isOpen || !pkg) return null;
-
-  const [pickedUpBy, setPickedUpBy] = useState<string>(pkg.residentName || '');
+  // Hooks SEMPRE chamados, sem early-return antes deles (regra dos hooks) — o modal
+  // nunca desmonta de fato (só alterna isOpen), então um `if (!isOpen) return null`
+  // ANTES do useState mudava a contagem de hooks entre renders e corrompia o estado
+  // silenciosamente. Era a causa mais provável da assinatura digital sumir do recibo.
+  const [pickedUpBy, setPickedUpBy] = useState<string>('');
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [handoverPhoto, setHandoverPhoto] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [operator, setOperator] = useState<string>(operatorName || 'Porteiro');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Reseta o formulário sempre que o modal abre para uma encomenda (nova ou distinta) —
+  // como o componente não desmonta mais, sem isso os campos manteriam dados da retirada anterior.
+  useEffect(() => {
+    if (isOpen && pkg) {
+      setPickedUpBy(pkg.residentName || '');
+      setSignatureDataUrl(null);
+      setHandoverPhoto(null);
+      setIsSubmitting(false);
+      setOperator(operatorName || 'Porteiro');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, pkg?.id]);
+
+  if (!isOpen || !pkg) return null;
 
   // Handle Photo Capture from device camera or file upload
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
