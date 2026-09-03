@@ -576,8 +576,8 @@ export default function App() {
 
   return (
     <>
-      {totemMode ? (
-        // Kiosk mode: Totem de Autoatendimento, sem autenticação (equipamento físico na portaria)
+      {totemMode || session?.type === 'totem' ? (
+        // Kiosk mode: Totem de Autoatendimento, sem autenticação pessoal (equipamento físico na portaria)
         <div className="min-h-screen bg-[#F8F9FA] text-[#1A2E22] flex flex-col font-sans antialiased">
           <div className="max-w-4xl mx-auto w-full px-4 pt-4">
             <button
@@ -586,7 +586,9 @@ export default function App() {
                 // Encerra a sessao do totem ao sair do quiosque — nao deixa
                 // a credencial de servico "logada" fora do modo Totem.
                 await authService.clearSession();
+                setSession(null);
                 setTotemMode(false);
+                setPreAuthView('landing');
               }}
               className="text-xs font-bold text-[#0D3823] hover:text-[#D81B60] flex items-center gap-1.5 transition-colors"
             >
@@ -680,6 +682,12 @@ export default function App() {
                 units={units}
                 onShowToast={showToast}
               />
+            </ErrorBoundary>
+          )}
+
+          {session.type === 'totem' && (
+            <ErrorBoundary fallbackTitle="Erro ao carregar o Totem de Autoatendimento">
+              <TotemView units={units} packages={packages} onAddPackage={handleAddPackage} onShowToast={showToast} />
             </ErrorBoundary>
           )}
         </AppShell>
