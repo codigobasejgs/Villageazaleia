@@ -32,6 +32,8 @@ interface MoradorViewProps {
   units: Unit[];
   /** Unidade do morador logado (vem da sessão — ver src/services/auth.service.ts) */
   activeUnitId: string;
+  /** Nome pessoal do morador que está navegando (ex: "Giuliana" ou "Jefferson") */
+  residentDisplayName?: string;
   onUpdateUnit?: (updatedUnit: Unit) => void;
   notifications?: PushNotification[];
   onTriggerTestPush?: (unit: Unit) => void;
@@ -42,6 +44,7 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
   packages,
   units,
   activeUnitId,
+  residentDisplayName,
   onUpdateUnit,
   notifications = [],
   onShowToast
@@ -59,11 +62,15 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
     return units.find((u) => u.id === activeUnitId) || units[0];
   }, [units, activeUnitId]);
 
-  // Packages for this unit — currentUnit pode ser undefined por 1 render logo apos
-  // o cadastro/login, enquanto o fetch de units ainda nao terminou (evita crash -> tela branca).
+  // Packages for this unit — case-insensitive no bloco (12B e 12b são o mesmo prédio)
+  // e numérico no apartamento. Assim, todos os moradores da mesma residência
+  // (mesmo com contas de login separadas) vêem as MESMAS encomendas unificadas.
   const myPackages = useMemo(() => {
     if (!currentUnit) return [];
-    return packages.filter((p) => String(p.block) === String(currentUnit.block) && p.apartment === currentUnit.apartment);
+    const unitBlock = String(currentUnit.block || '').trim().toLowerCase();
+    return packages.filter(
+      (p) => String(p.block || '').trim().toLowerCase() === unitBlock && Number(p.apartment) === Number(currentUnit.apartment)
+    );
   }, [packages, currentUnit]);
 
   const availablePackages = useMemo(() => {
@@ -74,10 +81,13 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
     return myPackages.filter((p) => p.status === 'RETIRADA');
   }, [myPackages]);
 
-  // Filter push notifications for this unit
+  // Filter push notifications for this unit (mesma lógica case-insensitive)
   const myNotifications = useMemo(() => {
     if (!currentUnit) return [];
-    return notifications.filter((n) => String(n.block) === String(currentUnit.block) && n.apartment === currentUnit.apartment);
+    const unitBlock = String(currentUnit.block || '').trim().toLowerCase();
+    return notifications.filter(
+      (n) => String(n.block || '').trim().toLowerCase() === unitBlock && Number(n.apartment) === Number(currentUnit.apartment)
+    );
   }, [notifications, currentUnit]);
 
   const handleInstallPWA = async () => {
@@ -143,7 +153,7 @@ export const MoradorView: React.FC<MoradorViewProps> = ({
                   <span className="text-[10px] sm:text-xs text-white/80 font-medium">Condomínio Village Azaleia</span>
                 </div>
                 <h1 className="text-lg sm:text-2xl font-black text-white leading-tight">
-                  Olá, {currentUnit.residentName}
+                  Olá, {residentDisplayName || currentUnit.residentName}
                 </h1>
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-emerald-100/90 font-bold">
                   <span className="px-2 py-0.5 rounded-md bg-white/10 border border-white/15">

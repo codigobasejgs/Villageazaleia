@@ -567,7 +567,9 @@ export default function App() {
   const loggedInDisplayName = useMemo(() => {
     if (!session) return '';
     if (session.type === 'morador') {
-      return units.find((u) => u.id === session.unitId)?.residentName || 'Morador';
+      // Exibe o nome pessoal do morador que está logado (da sua própria conta/perfil).
+      // Se não tiver nome no perfil, faz fallback para o nome cadastrado na unidade.
+      return session.profile?.name || units.find((u) => u.id === session.unitId)?.residentName || 'Morador';
     }
     return session.type === 'sindico' ? 'Síndico' : 'Porteiro';
   }, [session, units]);
@@ -663,6 +665,7 @@ export default function App() {
                 packages={packages}
                 units={units}
                 activeUnitId={session.unitId}
+                residentDisplayName={loggedInDisplayName}
                 onUpdateUnit={handleUpdateUnit}
                 notifications={pushNotifications}
                 onShowToast={showToast}

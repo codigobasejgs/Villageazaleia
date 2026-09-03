@@ -1,79 +1,88 @@
 /**
  * POST /api/units/claim
- * Cadastro seguro de morador: cria a conta no Supabase Auth, insere a Unit no
- * banco (apenas se o bloco+apartamento estiver livre) e vincula o perfil.
+ * Cria conta de Morador e vincula à unidade (Bloco + Apto).
  *
- * Fecha o BUG-007 (sequestro de unidade por cadastro duplicado).
+ * SUPORTE A MÚLTIPLOS MORADORES POR UNIDADE:
+ * Até 5 moradores da mesma residência (ex: Jefferson e Giuliana no Bloco 12B Apto 23)
+ * podem criar suas próprias contas no app com e-mails diferentes e ter acesso às
+ * MESMAS encomendas do apartamento.
+ *
+ * - Se a unidade AINDA NÃO EXISTE: cria o usuário em auth.users, insere a linha
+ *   na tabela units (com ID canônico B12B-A23, bloco em maiúsculas), e cria o profile.
+ * - Se a unidade JÁ EXISTE: cria o usuário em auth.users com seu próprio e-mail,
+ *   vincula o profile à MESMA unidade já existente, e adiciona o telefone do novo
+ *   morador à lista `resident_phones` da unidade (até o limite de 5 contatos).
  */
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const adminHeaders = () => ({
-  apikey: SERVICE_ROLE_KEY,
-  Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-  'Content-Type': 'application/json'
-});
+function adminHeaders() {
+  return {
+    apikey: SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json'
+  };
+}
 
 export async function POST(request: Request): Promise<Response> {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    return new Response(JSON.stringify({ ok: false, error: 'Servidor nao configurado.' }), { status: 503 });
+    console.error('[Units Claim] SUPABASE_SERVICE_ROLE_KEY ou SUPABASE_URL ausente.');
+    return new Response(JSON.stringify({ ok: false, error: 'Servidor nao configurado.' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  let body: {
-    block?: string;
-    apartment?: number;
-    residentName?: string;
-    residentEmail?: string;
-    residentPhone?: string;
-    residentPhones?: Array<{ id: string; label: string; number: string; isWhatsapp: boolean }>;
-    password?: string;
-    lgpdAccepted?: boolean;
-  };
-
+  let body: any;
   try {
     body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ ok: false, error: 'JSON invalido.' }), { status: 400 });
+    return new Response(JSON.stringify({ ok: false, error: 'Body JSON invalido.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
-  const { block, apartment, residentName, residentEmail, residentPhone, password, lgpdAccepted } = body;
+  const { block, apartment, residentName, residentPhone, residentEmail, password, lgpdAccepted } = body || {};
 
   if (!block || !apartment || !residentName || !residentEmail || !password) {
-    return new Response(JSON.stringify({ ok: false, error: 'Campos obrigatorios nao preenchidos.' }), { status: 400 });
+    return new Response(JSON.stringify({ ok: false, error: 'Campos obrigatorios faltando.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   if (password.length < 8) {
-    return new Response(JSON.stringify({ ok: false, error: 'A senha precisa ter pelo menos 8 caracteres.' }), { status: 400 });
+    return new Response(JSON.stringify({ ok: false, error: 'A senha precisa ter no minimo 8 caracteres.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   if (!lgpdAccepted) {
-    return new Response(JSON.stringify({ ok: false, error: 'O consentimento LGPD e obrigatorio para o cadastro.' }), { status: 400 });
+    return new Response(JSON.stringify({ ok: false, error: 'O consentimento LGPD e obrigatorio para o cadastro.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const emailNorm = residentEmail.trim().toLowerCase();
-  const unitId = `B${String(block).padStart(2, '0')}-A${apartment}`;
+  // Bloco canônico sempre em maiúsculas (ex: "12B", não "12b") para evitar unidades duplicadas
+  const blockNorm = String(block).trim().toUpperCase();
+  const aptNum = Number(apartment);
+  const canonicalUnitId = `B${blockNorm.padStart(2, '0')}-A${aptNum}`;
 
   try {
-    // 1. Verifica se a unidade ja esta cadastrada no banco
+    // 1. Verifica se já existe uma unidade para esse bloco e apartamento
     const unitCheckRes = await fetch(
-      `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/units?block=eq.${encodeURIComponent(block)}&apartment=eq.${apartment}&select=id,resident_name`,
+      `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/units?block=ilike.${encodeURIComponent(blockNorm)}&apartment=eq.${aptNum}&select=*&limit=1`,
       { headers: adminHeaders(), signal: AbortSignal.timeout(8000) }
     );
     const existingUnits = await unitCheckRes.json();
+    const existingUnit = Array.isArray(existingUnits) && existingUnits.length > 0 ? existingUnits[0] : null;
 
-    if (Array.isArray(existingUnits) && existingUnits.length > 0) {
-      // Unidade ja ocupada: impede sobrescrever (BUG-007)
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: `O Bloco ${block} Apto ${apartment} ja possui cadastro ativo no sistema. Procure a portaria ou o sindico caso precise atualizar o titular.`
-        }),
-        { status: 409 }
-      );
-    }
-
-    // 2. Cria o usuario no Supabase Auth
+    // 2. Cria o usuário no Supabase Auth
     const userRes = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/users`, {
       method: 'POST',
       headers: adminHeaders(),
@@ -88,10 +97,6 @@ export async function POST(request: Request): Promise<Response> {
 
     if (!userRes.ok) {
       const err = await userRes.json().catch(() => ({}));
-      // A Admin API do Supabase varia o formato do erro entre versoes: as vezes
-      // vem em `msg`, as vezes em `message`, e sempre tem `error_code` quando
-      // e um caso conhecido. Checar so `.message` deixava esse erro invisivel
-      // (campo undefined -> string vazia -> nenhuma keyword batia).
       const rawMsg = err.msg || err.message || err.error_description || '';
       const m = String(rawMsg).toLowerCase();
       const isDuplicate =
@@ -102,64 +107,102 @@ export async function POST(request: Request): Promise<Response> {
         m.includes('exists');
 
       if (isDuplicate) {
-        return new Response(JSON.stringify({ ok: false, error: 'Este e-mail ja possui conta. Use "Entrar".' }), { status: 409 });
+        return new Response(JSON.stringify({ ok: false, error: 'Este e-mail ja possui conta. Use "Entrar".' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
       return new Response(
-        JSON.stringify({ ok: false, error: 'Falha ao criar usuario' + (rawMsg ? ': ' + rawMsg : ' (sem detalhes do servidor).') }),
-        { status: 400 }
+        JSON.stringify({ ok: false, error: 'Falha ao criar usuario' + (rawMsg ? ': ' + rawMsg : '.') }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     const userData = await userRes.json();
     const userId = userData.id;
 
-    // 3. Insere a Unit no banco
-    const nowIso = new Date().toISOString();
-    const phones = (body.residentPhones || []).filter((p) => {
-      const clean = (p.number || '').replace(/\D/g, '');
-      return clean.length >= 10 && !clean.includes('999990000');
-    });
+    let targetUnitId = canonicalUnitId;
+    let finalUnitRow: any = null;
 
-    const unitRow = {
-      id: unitId,
-      block: String(block),
-      apartment: Number(apartment),
-      resident_name: residentName.trim(),
-      resident_phone: residentPhone ? residentPhone.trim() : (phones[0]?.number || ''),
-      resident_phones: phones,
-      resident_email: emailNorm,
-      pwa_installed: true,
-      push_enabled: true,
-      registered_at: nowIso,
-      lgpd_accepted: true,
-      lgpd_accepted_at: nowIso
-    };
+    if (existingUnit) {
+      // CENÁRIO A: Unidade já existe (familiar se cadastrando no mesmo apartamento)
+      targetUnitId = existingUnit.id;
+      finalUnitRow = existingUnit;
 
-    const unitInsertRes = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/units`, {
-      method: 'POST',
-      headers: { ...adminHeaders(), Prefer: 'return=representation' },
-      body: JSON.stringify(unitRow),
-      signal: AbortSignal.timeout(8000)
-    });
+      // Adiciona o telefone do novo morador na lista de telefones da unidade (se couber, max 5)
+      const newPhoneClean = String(residentPhone || '').replace(/\D/g, '');
+      const currentPhones: any[] = Array.isArray(existingUnit.resident_phones) ? existingUnit.resident_phones : [];
+      const phoneJaExiste = currentPhones.some((p) => String(p.number || '').replace(/\D/g, '') === newPhoneClean);
 
-    if (!unitInsertRes.ok) {
-      // Rollback: remove o auth.user se o insert da unit falhar (com timeout seguro)
-      try {
-        await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/users/${userId}`, {
-          method: 'DELETE',
+      if (newPhoneClean.length >= 10 && !phoneJaExiste && currentPhones.length < 5) {
+        const updatedPhones = [
+          ...currentPhones,
+          {
+            id: `phone-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            label: residentName.trim().split(' ')[0] || 'Familiar',
+            number: residentPhone.trim(),
+            isWhatsapp: true
+          }
+        ];
+        // Atualiza a unidade com a lista unificada de telefones
+        await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/units?id=eq.${encodeURIComponent(targetUnitId)}`, {
+          method: 'PATCH',
           headers: adminHeaders(),
+          body: JSON.stringify({ resident_phones: updatedPhones }),
           signal: AbortSignal.timeout(8000)
         });
-      } catch {
-        // Log silencioso do rollback
       }
-      return new Response(JSON.stringify({ ok: false, error: 'Nao foi possivel registrar a unidade.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
+    } else {
+      // CENÁRIO B: Primeiro morador do apartamento (cria a unidade no banco)
+      const nowIso = new Date().toISOString();
+      const phones = (body.residentPhones || []).filter((p: any) => {
+        const clean = (p.number || '').replace(/\D/g, '');
+        return clean.length >= 10 && !clean.includes('999990000');
       });
+
+      const unitRow = {
+        id: canonicalUnitId,
+        block: blockNorm,
+        apartment: aptNum,
+        resident_name: residentName.trim(),
+        resident_phone: residentPhone ? residentPhone.trim() : (phones[0]?.number || ''),
+        resident_phones: phones.length > 0 ? phones : (residentPhone ? [{ id: 'phone-1', label: 'Titular', number: residentPhone.trim(), isWhatsapp: true }] : []),
+        resident_email: emailNorm,
+        pwa_installed: true,
+        push_enabled: true,
+        registered_at: nowIso,
+        lgpd_accepted: true,
+        lgpd_accepted_at: nowIso
+      };
+
+      const unitInsertRes = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/units`, {
+        method: 'POST',
+        headers: { ...adminHeaders(), Prefer: 'return=representation' },
+        body: JSON.stringify(unitRow),
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (!unitInsertRes.ok) {
+        // Rollback: remove o auth.user se o insert da unit falhar
+        try {
+          await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: adminHeaders(),
+            signal: AbortSignal.timeout(8000)
+          });
+        } catch {
+          // ignora
+        }
+        return new Response(JSON.stringify({ ok: false, error: 'Nao foi possivel registrar a unidade.' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      finalUnitRow = unitRow;
     }
 
-    // 4. Cria o perfil vinculado a unidade (com checagem de erro + rollback completo se falhar)
+    // 3. Cria o perfil do morador vinculado à unidade (com rollback do auth se falhar)
     const profileRes = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/profiles`, {
       method: 'POST',
       headers: adminHeaders(),
@@ -167,39 +210,42 @@ export async function POST(request: Request): Promise<Response> {
         id: userId,
         role: 'morador',
         name: residentName.trim(),
-        unit_id: unitId,
+        unit_id: targetUnitId,
         active: true
       }),
       signal: AbortSignal.timeout(8000)
     });
 
     if (!profileRes.ok) {
-      // Rollback em cadeia: apaga unit e auth.user pra nao deixar orfao
+      const pErr = await profileRes.json().catch(() => ({}));
+      console.warn('[Units Claim] Falha ao criar profile:', pErr);
+      // Se falhou por índice único de profile (1 morador por unidade), tenta rollback
       try {
-        await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/units?id=eq.${encodeURIComponent(unitId)}`, {
-          method: 'DELETE',
-          headers: adminHeaders(),
-          signal: AbortSignal.timeout(8000)
-        });
         await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/users/${userId}`, {
           method: 'DELETE',
           headers: adminHeaders(),
           signal: AbortSignal.timeout(8000)
         });
       } catch {
-        // Falha no rollback nao bloqueia resposta
+        // ignora
       }
-      return new Response(JSON.stringify({ ok: false, error: 'Nao foi possivel criar o perfil do morador.' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'Nao foi possivel vincular o perfil a unidade. Execute a migration SQL do Supabase caso mais de um morador resida no mesmo apartamento.'
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
-    return new Response(JSON.stringify({ ok: true, unit: unitRow }), {
+    return new Response(JSON.stringify({ ok: true, unit: finalUnitRow }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ ok: false, error: err?.message || 'Erro interno.' }), { status: 500 });
+    return new Response(JSON.stringify({ ok: false, error: err?.message || 'Erro interno.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
