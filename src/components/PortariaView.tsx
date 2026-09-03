@@ -7,7 +7,10 @@ import {
   PlusCircle,
   Archive,
   Search,
-  PenTool
+  PenTool,
+  Camera,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
@@ -15,6 +18,7 @@ import { HandoverModal } from './HandoverModal';
 import { DeliveryReceiptModal } from './DeliveryReceiptModal';
 import { PackageIntakeFlow, PackageIntakePayload } from './PackageIntakeFlow';
 import { ShelfOccupancyMap } from './ShelfOccupancyMap';
+import { QrCodeScanner } from './QrCodeScanner';
 
 interface PortariaViewProps {
   packages: PackageItem[];
@@ -50,6 +54,7 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
   const [selectedPackageForCheckout, setSelectedPackageForCheckout] = useState<PackageItem | null>(null);
   const [receiverName, setReceiverName] = useState('');
   const [filterTextSaida, setFilterTextSaida] = useState('');
+  const [isQrCameraOpen, setIsQrCameraOpen] = useState(false);
 
   // HANDOVER & RECEIPT MODALS STATE
   const [isHandoverModalOpen, setIsHandoverModalOpen] = useState(false);
@@ -198,17 +203,38 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
           {/* QR Code Scanner & Search Bar */}
           <div className="lg:col-span-5 space-y-5">
             <div className="bg-white rounded-2xl border border-[#D4AF37]/35 p-6 shadow-md space-y-4">
-              <div>
-                <h3 className="text-lg font-extrabold text-[#0D3823] flex items-center gap-2">
-                  <QrCode className="w-5 h-5 text-[#D81B60]" />
-                  <span>Leitura do QR Code do Morador</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Aproxime o smartphone do morador com o QR Code ou digite o código de rastreio
-                </p>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#0D3823] flex items-center gap-2">
+                    <QrCode className="w-5 h-5 text-[#D81B60]" />
+                    <span>Leitura do QR Code do Morador</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Escaneie pela câmera ou digite o código de rastreio
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQrCameraOpen((v) => !v)}
+                  className="px-3 py-1.5 rounded-lg bg-[#0D3823] hover:bg-[#15462D] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                >
+                  <Camera className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span className="hidden sm:inline">{isQrCameraOpen ? 'Fechar Câmera' : 'Escanear QR'}</span>
+                  {isQrCameraOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
               </div>
 
-              {/* QR Code Reader */}
+              {isQrCameraOpen && (
+                <QrCodeScanner
+                  onDecode={(text) => {
+                    handleQrSearch(text);
+                    setIsQrCameraOpen(false);
+                  }}
+                  onClose={() => setIsQrCameraOpen(false)}
+                />
+              )}
+
+              {/* QR Code Reader (digitado) */}
               <div className="relative">
                 <QrCode className="w-4 h-4 text-[#D81B60] absolute left-3.5 top-3" />
                 <input
@@ -217,7 +243,7 @@ export const PortariaView: React.FC<PortariaViewProps> = ({
                   onChange={(e) => handleQrSearch(e.target.value)}
                   placeholder="Código QR (Ex: QR-B03A102-PKG001) ou Rastreio..."
                   className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#0D3823] font-mono focus:outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20 shadow-inner"
-                  autoFocus
+                  autoFocus={!isQrCameraOpen}
                 />
               </div>
             </div>

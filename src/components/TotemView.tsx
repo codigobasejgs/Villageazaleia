@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PackageItem, Unit, Carrier, StorageLocation } from '../types';
 import { CARRIER_CONFIG, SAMPLE_PACKAGE_PHOTOS } from '../data/mockData';
-import { RotateCcw, CheckCircle2, Camera, ChevronDown, ChevronUp, Zap, AlertCircle } from 'lucide-react';
+import { RotateCcw, CheckCircle2, Camera, ChevronDown, ChevronUp, Zap, AlertCircle, Clock, PauseCircle, PlayCircle, Pencil } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { BarcodeDisplay } from './VisualCodes';
 import { VillageAzaleiaLogo } from './VillageAzaleiaLogo';
@@ -29,12 +29,14 @@ interface RegisteredTicket {
   hasContact: boolean;
 }
 
+const AUTO_CONFIRM_SECONDS = 2;
+
 /**
- * Totem do entregador: tela enxuta e linear, de propósito — escaneia a etiqueta (autofill
- * de transportadora + rastreio), digita bloco/apto manualmente (sem sugestão automática de
- * unidade — decisão explícita do dono do sistema) e confirma. Nada de card de confiança,
- * contagem regressiva ou fallback de correspondência: é o formulário da Portaria (ver
- * PackageIntakeFlow.tsx) que fica com essa automação mais rica; aqui o objetivo é rapidez.
+ * Totem do entregador: só o nome do entregador é digitado. Bloco e apartamento vêm da
+ * leitura automática da etiqueta (Gemini Vision) — quando a leitura acha uma unidade real,
+ * confirma sozinho após uma contagem de 2s (cancelável). Se a etiqueta não tiver bloco/apto
+ * legíveis, ou não bater com nenhuma unidade cadastrada, abre a correção manual como EXCEÇÃO,
+ * não como regra — decisão do dono do sistema.
  */
 export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPackage, onShowToast }) => {
   const [deliveryGuyName, setDeliveryGuyName] = useState('');
@@ -47,6 +49,12 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
   const [ticket, setTicket] = useState<RegisteredTicket | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Preenchidos automaticamente pela leitura da etiqueta. So aparecem editaveis quando a
+  // leitura falha (excecao) ou quando o entregador pede pra corrigir manualmente.
+  const [manualOverride, setManualOverride] = useState(false);
+  const [autoConfirmCountdown, setAutoConfirmCountdown] = useState<number | null>(null);
+  const [isCountdownPaused, setIsCountdownPaused] = useState(false);
+
   // Correspondência exata (sem sugestão/fuzzy) — só acha quando bloco+apto batem certinho.
   // Bloco é texto livre (pode ter letra, ex: "12B"), comparado sem diferenciar maiúsculas.
   const matchedUnit = useMemo(() => {
@@ -58,14 +66,40 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
 
   const hasUnitTypo = blockInput.trim() !== '' && apartmentInput.trim() !== '' && !matchedUnit;
 
-  // Escaneou a etiqueta: só aproveita transportadora + rastreio + foto — bloco/apto continuam manuais
+  // Escaneou a etiqueta: transportadora, rastreio, foto E bloco/apto — tudo automático.
+  // Só entra em modo manual (excecao) se a etiqueta nao tiver unidade legivel/valida.
   const handleScanComplete = (extracted: ExtractedLabelData, capturedPhotoUrl: string) => {
+    if (!deliveryGuyName.trim()) {
+      onShowToast('Informe seu nome antes de escanear a etiqueta.', 'warning');
+      return;
+    }
+
     setCarrier(extracted.carrier);
     setScannedPhoto(capturedPhotoUrl);
     if (extracted.trackingCode) {
       setTrackingInput(extracted.trackingCode);
     }
-    onShowToast('Transportadora e rastreio lidos! Agora digite o bloco e o apartamento.', 'success');
+
+    if (extracted.block && extracted.apartment) {
+      const found = units.find(
+        (u) => u.block.toLowerCase() === extracted.block!.toLowerCase() && u.apartment === extracted.apartment
+      );
+      setBlockInput(extracted.block);
+      setApartmentInput(String(extracted.apartment));
+
+      if (found) {
+        setManualOverride(false);
+        setIsCountdownPaused(false);
+        setAutoConfirmCountdown(AUTO_CONFIRM_SECONDS);
+        onShowToast(`Unidade identificada: Bloco ${found.block} Apto ${found.apartment} (${found.residentName})`, 'success');
+        return;
+      }
+    }
+
+    // Etiqueta lida, mas sem bloco/apto legivel ou sem unidade correspondente — excecao.
+    setAutoConfirmCountdown(null);
+    setManualOverride(true);
+    onShowToast('Não foi possível identificar a unidade automaticamente. Confira ou corrija o bloco/apartamento abaixo.', 'warning');
   };
 
   const handleGenerateTracking = () => {
@@ -83,7 +117,7 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
     const block = blockInput.trim();
     const apartment = parseInt(apartmentInput, 10);
     if (!block || !apartment) {
-      onShowToast('Informe o Bloco e o Apartamento de destino da encomenda.', 'warning');
+      onShowToast('Escaneie a etiqueta ou informe o Bloco e o Apartamento de destino.', 'warning');
       return;
     }
 
@@ -135,8 +169,29 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
       sound.playCheckout();
     } finally {
       setIsSubmitting(false);
+      setAutoConfirmCountdown(null);
     }
   };
+
+  // Contagem de 2s antes da confirmacao automatica — mesmo padrao ja usado na Portaria
+  // (PackageIntakeFlow), cancelavel com 1 toque se o entregador notar algo errado.
+  useEffect(() => {
+    if (autoConfirmCountdown === null || isCountdownPaused) return;
+
+    if (autoConfirmCountdown <= 0) {
+      handleConfirmDelivery();
+      setAutoConfirmCountdown(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      sound.playScanBeep();
+      setAutoConfirmCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConfirmCountdown, isCountdownPaused]);
 
   // Reset completo (botão do cabeçalho) — encerra o atendimento deste entregador
   const handleFullReset = () => {
@@ -148,6 +203,9 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
     setBlockInput('');
     setApartmentInput('');
     setTicket(null);
+    setManualOverride(false);
+    setAutoConfirmCountdown(null);
+    setIsCountdownPaused(false);
   };
 
   // Reset leve (botão pós-ticket) — mesmo entregador pode deixar outra encomenda em seguida
@@ -159,6 +217,9 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
     setBlockInput('');
     setApartmentInput('');
     setTicket(null);
+    setManualOverride(false);
+    setAutoConfirmCountdown(null);
+    setIsCountdownPaused(false);
   };
 
   return (
@@ -262,7 +323,7 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
         </div>
       ) : (
         <div className="space-y-4">
-          {/* 1. Identificação do Entregador */}
+          {/* 1. Identificação do Entregador — único campo sempre manual */}
           <div className="bg-white rounded-2xl border border-[#D4AF37]/35 p-4 shadow-md">
             <label className="block text-xs font-bold text-[#0D3823] uppercase tracking-wider mb-1.5">
               1. Seu nome ou a transportadora *
@@ -276,7 +337,7 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
             />
           </div>
 
-          {/* 2. Escanear etiqueta (autofill transportadora + rastreio) */}
+          {/* 2. Escanear etiqueta — le transportadora, rastreio E bloco/apto automaticamente */}
           <div className="bg-white rounded-2xl border border-[#D4AF37]/35 p-4 shadow-md space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-[#0D3823] uppercase tracking-wider">
@@ -335,55 +396,124 @@ export const TotemView: React.FC<TotemViewProps> = ({ units, packages, onAddPack
             </div>
           </div>
 
-          {/* 3. Bloco + Apartamento — sempre digitado à mão, sem sugestão automática */}
-          <div className="bg-white rounded-2xl border border-[#D4AF37]/35 p-4 shadow-md space-y-3">
-            <label className="block text-xs font-bold text-[#0D3823] uppercase tracking-wider">
-              3. Bloco e Apartamento de Destino
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="text"
-                value={blockInput}
-                onChange={(e) => setBlockInput(e.target.value)}
-                placeholder="Bloco (Ex: 3 ou 12B)"
-                className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl px-4 py-3 text-base text-[#0D3823] font-bold text-center focus:outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20 shadow-inner"
-              />
-              <input
-                type="number"
-                inputMode="numeric"
-                value={apartmentInput}
-                onChange={(e) => setApartmentInput(e.target.value)}
-                placeholder="Apartamento (Ex: 102)"
-                className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl px-4 py-3 text-base text-[#0D3823] font-bold text-center focus:outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20 shadow-inner"
-              />
-            </div>
-
-            {matchedUnit && (
+          {/* 3. Unidade — identificada automaticamente pela etiqueta. Correção manual só
+              aparece como exceção (leitura falhou) ou se o entregador pedir pra corrigir. */}
+          {autoConfirmCountdown !== null && matchedUnit && !manualOverride ? (
+            <div className="bg-white rounded-2xl border-2 border-[#A5D6A7] p-4 shadow-md space-y-3">
               <div className="p-3 rounded-xl bg-[#E8F5E9] border border-[#A5D6A7] flex items-center gap-2 text-sm">
                 <CheckCircle2 className="w-4 h-4 text-[#0D3823] shrink-0" />
                 <span className="text-[#0D3823] font-bold">
-                  Confirmar entrega para: {matchedUnit.residentName}
+                  Unidade identificada: Bloco {matchedUnit.block} Apto {matchedUnit.apartment} — {matchedUnit.residentName}
                 </span>
               </div>
-            )}
-            {hasUnitTypo && (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 flex items-center gap-2 text-sm">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="text-amber-800 font-semibold">Unidade não encontrada. Confira o bloco e o apartamento.</span>
-              </div>
-            )}
-          </div>
 
-          {/* Confirm */}
-          <button
-            type="button"
-            onClick={handleConfirmDelivery}
-            disabled={isSubmitting}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-black text-base shadow-xl shadow-[#D81B60]/25 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <CheckCircle2 className="w-5 h-5 text-[#FFF2B2]" />
-            <span>{isSubmitting ? 'Registrando...' : 'Confirmar Entrega & Avisar Morador'}</span>
-          </button>
+              <div className="bg-black/40 p-3 rounded-xl border border-slate-200/20 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-slate-100 font-semibold">
+                    <Clock className="w-4 h-4 text-[#D4AF37] animate-spin" />
+                    <span>
+                      {isCountdownPaused
+                        ? 'Pausado — toque em Retomar pra confirmar'
+                        : `Confirmando e avisando o morador em: ${autoConfirmCountdown}s...`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCountdownPaused(!isCountdownPaused);
+                      sound.playScanBeep();
+                    }}
+                    className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  >
+                    {isCountdownPaused ? <PlayCircle className="w-3.5 h-3.5" /> : <PauseCircle className="w-3.5 h-3.5" />}
+                    <span>{isCountdownPaused ? 'Retomar' : 'Pausar'}</span>
+                  </button>
+                </div>
+                {!isCountdownPaused && (
+                  <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#D4AF37] to-[#D81B60] transition-all duration-1000 ease-linear"
+                      style={{ width: `${(autoConfirmCountdown / AUTO_CONFIRM_SECONDS) * 100}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoConfirmCountdown(null);
+                  setManualOverride(true);
+                }}
+                className="w-full py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Algo errado? Corrigir manualmente</span>
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-[#D4AF37]/35 p-4 shadow-md space-y-3">
+              <label className="block text-xs font-bold text-[#0D3823] uppercase tracking-wider">
+                3. Bloco e Apartamento de Destino
+                {!manualOverride && (
+                  <span className="block text-[10px] font-medium text-slate-400 normal-case mt-0.5">
+                    Preenchido automaticamente ao escanear a etiqueta
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  value={blockInput}
+                  onChange={(e) => {
+                    setBlockInput(e.target.value);
+                    setAutoConfirmCountdown(null);
+                  }}
+                  placeholder="Bloco (Ex: 3 ou 12B)"
+                  className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl px-4 py-3 text-base text-[#0D3823] font-bold text-center focus:outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20 shadow-inner"
+                />
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={apartmentInput}
+                  onChange={(e) => {
+                    setApartmentInput(e.target.value);
+                    setAutoConfirmCountdown(null);
+                  }}
+                  placeholder="Apartamento (Ex: 102)"
+                  className="w-full bg-[#F8F9FA] border border-slate-300 rounded-xl px-4 py-3 text-base text-[#0D3823] font-bold text-center focus:outline-none focus:border-[#D81B60] focus:ring-2 focus:ring-[#D81B60]/20 shadow-inner"
+                />
+              </div>
+
+              {matchedUnit && (
+                <div className="p-3 rounded-xl bg-[#E8F5E9] border border-[#A5D6A7] flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-[#0D3823] shrink-0" />
+                  <span className="text-[#0D3823] font-bold">
+                    Confirmar entrega para: {matchedUnit.residentName}
+                  </span>
+                </div>
+              )}
+              {hasUnitTypo && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 flex items-center gap-2 text-sm">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-amber-800 font-semibold">Unidade não encontrada. Confira o bloco e o apartamento.</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Confirm — some quando o auto-confirm nao esta ativo (fluxo manual/excecao) */}
+          {autoConfirmCountdown === null && (
+            <button
+              type="button"
+              onClick={handleConfirmDelivery}
+              disabled={isSubmitting}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#D81B60] via-[#E91E63] to-[#AD1457] hover:from-[#AD1457] hover:to-[#880E4F] text-white font-black text-base shadow-xl shadow-[#D81B60]/25 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <CheckCircle2 className="w-5 h-5 text-[#FFF2B2]" />
+              <span>{isSubmitting ? 'Registrando...' : 'Confirmar Entrega & Avisar Morador'}</span>
+            </button>
+          )}
         </div>
       )}
     </div>
