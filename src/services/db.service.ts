@@ -12,9 +12,12 @@ import { Unit, PackageItem, ActivityLog, MultichannelDispatchReport, PushNotific
 // ==========================================
 
 export function mapUnitToDb(u: Unit) {
+  // Bloco sempre canônico em maiúsculas (ex: "12B", não "12b") — evita descasamento
+  // com a RLS do Postgres, que faz comparação case-sensitive `block = u.block`.
+  const blockNorm = String(u.block || '').trim().toUpperCase();
   return {
-    id: u.id,
-    block: String(u.block),
+    id: u.id || `B${blockNorm.padStart(2, '0')}-A${u.apartment}`,
+    block: blockNorm,
     apartment: Number(u.apartment),
     resident_name: u.residentName,
     resident_phone: u.residentPhone,
@@ -46,12 +49,18 @@ export function mapUnitFromDb(row: any): Unit {
 }
 
 export function mapPackageToDb(pkg: PackageItem) {
+  const blockNorm = String(pkg.block || '').trim().toUpperCase();
+  const aptNum = Number(pkg.apartment);
+  // Se unit_id vier vazio, deriva o ID canônico B12B-A23 — garante que a RLS do
+  // morador no Supabase (unit_id = current_unit_id) encontre a encomenda diretamente.
+  const resolvedUnitId = pkg.unitId || `B${blockNorm.padStart(2, '0')}-A${aptNum}`;
+
   return {
     id: pkg.id,
     tracking_code: pkg.trackingCode,
-    unit_id: pkg.unitId || null,
-    block: String(pkg.block),
-    apartment: Number(pkg.apartment),
+    unit_id: resolvedUnitId,
+    block: blockNorm,
+    apartment: aptNum,
     resident_name: pkg.residentName,
     carrier: pkg.carrier,
     shelf: pkg.shelf,
