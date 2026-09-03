@@ -6,7 +6,8 @@ interface GeminiLabelResponse {
   carrier: Carrier;
   trackingCode: string | null;
   recipientName: string | null;
-  block: number | null;
+  // Bloco pode ter letra (ex: "12B") — igual ao tipo de Unit.block em types.ts.
+  block: string | null;
   apartment: number | null;
   rawText: string;
   confidence: number;

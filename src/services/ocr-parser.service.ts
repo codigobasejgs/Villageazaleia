@@ -3,7 +3,8 @@ import { Carrier } from '../types';
 export interface ExtractedLabelData {
   rawText: string;
   recipientName: string | null;
-  block: number | null;
+  // Bloco pode ter letra (ex: "12B") — igual ao tipo de Unit.block em types.ts.
+  block: string | null;
   apartment: number | null;
   trackingCode: string | null;
   carrier: Carrier;
@@ -151,7 +152,9 @@ export class OcrParserService {
     return {
       rawText: text,
       recipientName,
-      block: unitResult.block,
+      // extractUnit() so reconhece bloco numerico (1-12) via regex; blocos com letra
+      // (ex: "12B") so o Gemini le corretamente na foto real — ver gemini-ocr.service.ts.
+      block: unitResult.block != null ? String(unitResult.block) : null,
       apartment: unitResult.apartment,
       trackingCode,
       carrier,

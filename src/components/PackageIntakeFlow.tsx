@@ -149,10 +149,9 @@ export const PackageIntakeFlow: React.FC<PackageIntakeFlowProps> = ({
     setSelectedLevel(slotAllocation.level);
 
     // 2. Perform fuzzy & unit matching against Village Azaleia 360 units
-    // (OCR só lê blocos numéricos por enquanto; blocos com letra são digitados à mão)
     const match = residentMatcherService.matchResident(
       units,
-      extracted.block != null ? String(extracted.block) : null,
+      extracted.block,
       extracted.apartment,
       extracted.recipientName
     );

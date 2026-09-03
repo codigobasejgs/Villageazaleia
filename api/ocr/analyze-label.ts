@@ -31,9 +31,9 @@ const RESPONSE_SCHEMA = {
       description: 'Nome completo do destinatário impresso na etiqueta, se legível.'
     },
     block: {
-      type: Type.NUMBER,
+      type: Type.STRING,
       nullable: true,
-      description: 'Número do bloco/prédio do condomínio, se impresso na etiqueta (só dígitos).'
+      description: 'Identificador do bloco/prédio do condomínio, se impresso na etiqueta. Pode ser só número ("3") ou alfanumérico ("12B") — copie exatamente como está impresso, sem adicionar nem remover letras.'
     },
     apartment: {
       type: Type.NUMBER,
@@ -57,7 +57,7 @@ Analise a foto da etiqueta anexada e extraia com precisão:
 - A transportadora (normalize para exatamente uma destas opções: "Mercado Livre", "Amazon", "Correios", "Shopee", "Loggi" ou "Outra").
 - O código de rastreio/pedido.
 - O nome completo do destinatário.
-- O número do bloco e do apartamento do condomínio, SE estiverem impressos (apenas dígitos, sem letras).
+- O bloco e o apartamento do condomínio, SE estiverem impressos. O apartamento é sempre numérico. O bloco pode ter letra no final (ex: "12B") — transcreva exatamente como impresso, não arredonde para só números.
 - Todo o texto legível da etiqueta em "rawText".
 - Uma confiança de 0 a 100 refletindo a nitidez e completude da leitura.
 Se algum campo não estiver legível ou não existir na etiqueta, retorne null para ele (exceto carrier, rawText e confidence, que são obrigatórios).`;
