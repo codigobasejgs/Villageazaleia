@@ -482,9 +482,8 @@ export default function App() {
 
   // Update / Register a unit profile.
   // skipDbSync=true quando a unidade ja foi criada no banco por outra via
-  // (ex: /api/units/claim no cadastro) — evita um upsert redundante que a
-  // RLS nova rejeitaria mesmo (morador so tem policy de UPDATE, nao INSERT).
-  const handleUpdateUnit = (updatedUnit: Unit, skipDbSync = false) => {
+  // (ex: /api/units/claim no cadastro) — evita repetir a escrita pelo cliente.
+  const handleUpdateUnit = async (updatedUnit: Unit, skipDbSync = false) => {
     setUnits((prev) => {
       const exists = prev.some((u) => u.id === updatedUnit.id || (String(u.block) === String(updatedUnit.block) && u.apartment === updatedUnit.apartment));
       if (exists) {
@@ -493,8 +492,16 @@ export default function App() {
       return [updatedUnit, ...prev];
     });
 
-    if (!skipDbSync) {
-      dbService.upsertUnit(updatedUnit);
+    if (skipDbSync) return;
+
+    // updateUnit() faz UPDATE puro (nao upsert) — a RLS do morador so permite UPDATE
+    // na propria unidade, nao INSERT. Sem isso, editar o cadastro (ex: adicionar
+    // telefone) parecia salvar na hora e sumia no refresh (nunca chegava no banco).
+    const ok = await dbService.updateUnit(updatedUnit);
+    if (!ok) {
+      showToast('Não foi possível salvar as alterações no servidor. Tente novamente.', 'warning');
+      const refreshed = await dbService.fetchUnits();
+      if (refreshed) setUnits(refreshed);
     }
   };
 

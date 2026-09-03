@@ -169,6 +169,29 @@ export const dbService = {
     }
   },
 
+  /**
+   * Atualiza uma unidade JA existente (UPDATE puro, sem componente de INSERT).
+   *
+   * upsert() vira `INSERT ... ON CONFLICT DO UPDATE` no Postgres — mesmo so
+   * atualizando uma linha existente, a RLS avalia a politica de INSERT primeiro,
+   * e o morador so tem policy de UPDATE (nao INSERT) em `units`. Resultado: editar
+   * o proprio cadastro (ex: adicionar telefone) parecia salvar (state otimista) e
+   * sumia no refresh, porque o upsert nunca era aceito pelo banco.
+   */
+  async updateUnit(unit: Unit): Promise<boolean> {
+    try {
+      const { error } = await supabase.from('units').update(mapUnitToDb(unit)).eq('id', unit.id);
+      if (error) {
+        console.warn('[Supabase] updateUnit error:', error.message);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Supabase] updateUnit exception:', err);
+      return false;
+    }
+  },
+
   async seedUnits(units: Unit[]): Promise<boolean> {
     try {
       const payload = units.map(mapUnitToDb);
