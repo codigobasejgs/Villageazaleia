@@ -21,7 +21,9 @@ export default defineConfig(() => {
           description:
             'PWA e Sistema de Gestão Inteligente de Encomendas do Condomínio Residencial Village Azaleia — Portaria, Totem, Morador e Síndico.',
           theme_color: '#0D3823',
-          background_color: '#F8F9FA',
+          // Verde da marca (era #F8F9FA): esta cor pinta a splash screen de abertura do
+          // app instalado. Em branco, dava um "flash" branco antes da tela carregar.
+          background_color: '#0D3823',
           display: 'standalone',
           orientation: 'portrait',
           start_url: '/',

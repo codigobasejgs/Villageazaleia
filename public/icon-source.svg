@@ -38,8 +38,10 @@
     </linearGradient>
   </defs>
 
-  <!-- Full-bleed background: OS applies its own mask shape (maskable-safe) -->
-  <rect width="512" height="512" fill="url(#bgGrad)" />
+  <!-- Fundo verde SANGRADO até a borda (full-bleed), sem margem branca nem transparência:
+       o Android/iOS aplicam a própria máscara arredondada por cima, e qualquer área
+       transparente ou branca apareceria como "rebarba" branca ao redor do ícone. -->
+  <rect x="-1" y="-1" width="514" height="514" fill="url(#bgGrad)" />
 
   <!-- Azaleia flower, scaled + centered within the safe zone (~50% of canvas) -->
   <g transform="translate(96,96) scale(1.6)">
